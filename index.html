@@ -1,0 +1,56 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiSitioLocal</title>
+  <link rel="stylesheet" href="assets/styles/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="site-brand" href="index.html" aria-label="MiSitioLocal home">
+        <img src="assets/images/Logotipo_Zoom.png" alt="MiSitioLocal logo">
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="premium-services.html">Services</a>
+        <a href="blog.html">Blog</a>
+        <a href="booking.html">Booking</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-section">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="hero-eyebrow">ARTISTRY &middot; LEARNING &middot; CREATION</p>
+          <h1 class="hero-title">Art, Music &amp; Learning<br>Crafted Just For You</h1>
+          <div class="hero-actions">
+            <a class="button button-primary" href="booking.html">Book a Lesson</a>
+            <a class="button button-secondary premium-btn" href="premium-services.html">Premium Services</a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-logo">
+            <img src="assets/images/Logotipo_Zoom.png" alt="Logo" id="mainLogo">
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <audio id="doorSound" src="assets/audio/door.mp3"></audio>
+  <script>
+    const logo = document.getElementById("mainLogo");
+    const sound = document.getElementById("doorSound");
+
+    logo.addEventListener("click", () => {
+      sound.currentTime = 0;
+      sound.play();
+    });
+  </script>
+</body>
+</html>
+

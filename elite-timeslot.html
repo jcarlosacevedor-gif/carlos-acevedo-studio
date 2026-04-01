@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elite Monthly Timeslot | MiSitioLocal</title>
+  <link rel="stylesheet" href="assets/styles/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="site-brand" href="index.html" aria-label="MiSitioLocal home">
+        <img src="assets/images/Logotipo_Zoom.png" alt="MiSitioLocal logo">
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="premium-services.html">Services</a>
+        <a href="blog.html">Blog</a>
+        <a href="booking.html">Booking</a>
+      </nav>
+    </div>
+  </header>
+  <main class="timeslot-page">
+    <section class="timeslot-shell">
+      <div class="timeslot-language-toggle">
+        <input type="radio" name="timeslot-language" id="timeslot-lang-en" checked>
+        <input type="radio" name="timeslot-language" id="timeslot-lang-es">
+
+        <div class="timeslot-language-toggle-controls">
+          <label for="timeslot-lang-en" class="timeslot-lang-button">ENGLISH</label>
+          <label for="timeslot-lang-es" class="timeslot-lang-button">Espa&ntilde;ol</label>
+        </div>
+
+        <section class="timeslot-language-panel timeslot-language-en">
+          <p class="hero-eyebrow">PRIORITY RESERVATION</p>
+          <h1 class="timeslot-title">Elite Monthly Timeslot</h1>
+          <div class="timeslot-divider"></div>
+          <p class="timeslot-description">
+            Reserve a fixed weekly schedule and build consistency, progress, and priority access through a premium monthly arrangement.
+          </p>
+
+          <section class="timeslot-availability">
+            <h2 class="timeslot-section-title">Available Timeslots</h2>
+            <p class="timeslot-hint">Select one or more preferred slots</p>
+            <p class="timeslot-section-copy">
+              These are the currently available fixed weekly windows. This list is intentionally easy to update manually and designed for future automation.
+            </p>
+
+            <div class="timeslot-options">
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-en" value="Monday 6:00 PM">
+                <span>Monday &middot; 6:00 PM</span>
+              </label>
+
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-en" value="Tuesday 7:30 PM">
+                <span>Tuesday &middot; 7:30 PM</span>
+              </label>
+
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-en" value="Thursday 5:00 PM">
+                <span>Thursday &middot; 5:00 PM</span>
+              </label>
+
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-en" value="Saturday 10:00 AM">
+                <span>Saturday &middot; 10:00 AM</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="timeslot-form-section">
+            <h2 class="timeslot-section-title">Request Your Timeslot</h2>
+            <p class="timeslot-section-copy">
+              Tell me your name, your email, what you would like to study, and the weekly slot you would like to reserve.
+            </p>
+
+            <form class="timeslot-form">
+              <div class="timeslot-form-grid">
+                <div class="timeslot-field">
+                  <label for="full-name-en">Full Name</label>
+                  <input type="text" id="full-name-en" name="full-name" placeholder="Your full name">
+                </div>
+
+                <div class="timeslot-field">
+                  <label for="email-address-en">Email Address</label>
+                  <input type="email" id="email-address-en" name="email-address" placeholder="your@email.com">
+                </div>
+              </div>
+
+              <div class="timeslot-field">
+                <label for="study-focus-en">What would you like to study?</label>
+                <textarea id="study-focus-en" name="study-focus" rows="4" placeholder="Tell me what you would like to learn or improve"></textarea>
+              </div>
+
+              <div class="timeslot-field">
+                <label for="notes-en">Additional Notes</label>
+                <textarea id="notes-en" name="notes" rows="4" placeholder="Any extra details you would like to share"></textarea>
+              </div>
+
+              <div class="timeslot-actions">
+                <button type="submit" class="button button-primary">Secure My Timeslot</button>
+              </div>
+            </form>
+          </section>
+        </section>
+
+        <section class="timeslot-language-panel timeslot-language-es">
+          <p class="hero-eyebrow">RESERVA PRIORITARIA</p>
+          <h1 class="timeslot-title">Horario Mensual Elite</h1>
+          <div class="timeslot-divider"></div>
+          <p class="timeslot-description">
+            Reserva un horario fijo semanal y construye consistencia, progreso y acceso prioritario mediante un esquema mensual premium.
+          </p>
+
+          <section class="timeslot-availability">
+            <h2 class="timeslot-section-title">Horarios Disponibles</h2>
+            <p class="timeslot-hint">Selecciona uno o m&aacute;s horarios preferidos</p>
+            <p class="timeslot-section-copy">
+              Estos son los horarios fijos semanales disponibles actualmente. Esta lista est&aacute; pensada para actualizarse manualmente con facilidad y para futura automatizaci&oacute;n.
+            </p>
+
+            <div class="timeslot-options">
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-es" value="Monday 6:00 PM">
+                <span>Monday &middot; 6:00 PM</span>
+              </label>
+
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-es" value="Tuesday 7:30 PM">
+                <span>Tuesday &middot; 7:30 PM</span>
+              </label>
+
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-es" value="Thursday 5:00 PM">
+                <span>Thursday &middot; 5:00 PM</span>
+              </label>
+
+              <label class="timeslot-option">
+                <input type="checkbox" name="timeslot-es" value="Saturday 10:00 AM">
+                <span>Saturday &middot; 10:00 AM</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="timeslot-form-section">
+            <h2 class="timeslot-section-title">Solicita tu Horario</h2>
+            <p class="timeslot-section-copy">
+              Dime tu nombre, tu correo, qu&eacute; te gustar&iacute;a estudiar y el horario semanal que te gustar&iacute;a reservar.
+            </p>
+
+            <form class="timeslot-form">
+              <div class="timeslot-form-grid">
+                <div class="timeslot-field">
+                  <label for="full-name-es">Nombre Completo</label>
+                  <input type="text" id="full-name-es" name="full-name" placeholder="Tu nombre completo">
+                </div>
+
+                <div class="timeslot-field">
+                  <label for="email-address-es">Correo Electr&oacute;nico</label>
+                  <input type="email" id="email-address-es" name="email-address" placeholder="tu@email.com">
+                </div>
+              </div>
+
+              <div class="timeslot-field">
+                <label for="study-focus-es">&iquest;Qu&eacute; te gustar&iacute;a estudiar?</label>
+                <textarea id="study-focus-es" name="study-focus" rows="4" placeholder="Cu&eacute;ntame qu&eacute; te gustar&iacute;a aprender o mejorar"></textarea>
+              </div>
+
+              <div class="timeslot-field">
+                <label for="notes-es">Notas Adicionales</label>
+                <textarea id="notes-es" name="notes" rows="4" placeholder="Cualquier detalle extra que quieras compartir"></textarea>
+              </div>
+
+              <div class="timeslot-actions">
+                <button type="submit" class="button button-primary">Asegurar Mi Horario</button>
+              </div>
+            </form>
+          </section>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
