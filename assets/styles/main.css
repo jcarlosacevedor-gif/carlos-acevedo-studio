@@ -1,4 +1,4 @@
-@font-face {
+﻿@font-face {
   font-family: "Poppins";
   src: url("../fonts/poppins/Poppins-Light.ttf") format("truetype");
   font-weight: 300;
@@ -121,6 +121,11 @@ a {
 .site-nav a:hover,
 .site-nav a:focus-visible {
   color: var(--text-primary);
+}
+
+.site-nav a[aria-current="page"] {
+  color: var(--text-primary);
+  text-shadow: 0 0 12px rgba(102, 252, 241, 0.18);
 }
 
 .hero-section {
@@ -1220,6 +1225,55 @@ a {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
   gap: 16px;
+}
+
+.timeslot-day-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.timeslot-day {
+  border: 1px solid rgba(102, 252, 241, 0.16);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.34);
+  overflow: hidden;
+}
+
+.timeslot-day-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 18px 20px;
+  color: #ffffff;
+  font-family: "Poppins", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.timeslot-day-summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeslot-day-summary::after {
+  content: "+";
+  float: right;
+  color: rgba(102, 252, 241, 0.84);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.timeslot-day[open] .timeslot-day-summary {
+  background: rgba(102, 252, 241, 0.05);
+  color: #66FCF1;
+}
+
+.timeslot-day[open] .timeslot-day-summary::after {
+  content: "-";
+}
+
+.timeslot-day .timeslot-options {
+  padding: 0 20px 20px;
 }
 
 .timeslot-option {
