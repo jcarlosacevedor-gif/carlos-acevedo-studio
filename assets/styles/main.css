@@ -937,8 +937,18 @@ a {
   border-bottom: 1px solid rgba(102, 252, 241, 0.14);
 }
 
+.blog-card-image-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .blog-card-body {
   padding: 22px 20px 22px;
+}
+
+.blog-card-copy {
+  display: none;
 }
 
 .blog-card-meta {
@@ -1067,6 +1077,37 @@ a {
   margin-bottom: 0;
 }
 
+.post-language-panel .hero-eyebrow {
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.post-language-panel .post-title {
+  text-align: center;
+}
+
+.post-language-panel .post-divider {
+  margin-top: 16px;
+}
+
+.post-language-panel .post-meta {
+  text-align: center;
+}
+
+.post-feature-media {
+  margin: 0 0 28px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(102, 252, 241, 0.18);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+}
+
+.post-feature-image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
 #lang-en:checked ~ .post-language-en {
   display: block;
 }
@@ -1143,6 +1184,14 @@ a {
 }
 
 #blog-lang-es:checked ~ .blog-language-es {
+  display: block;
+}
+
+#blog-lang-en:checked ~ .blog-grid .blog-card-copy-en {
+  display: block;
+}
+
+#blog-lang-es:checked ~ .blog-grid .blog-card-copy-es {
   display: block;
 }
 .timeslot-page {
