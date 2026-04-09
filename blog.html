@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -22,118 +22,138 @@
   </header>
   <main class="blog-hero">
     <div class="blog-content">
-      <div class="blog-language-toggle">
-        <input type="radio" name="blog-language" id="blog-lang-en" checked>
-        <input type="radio" name="blog-language" id="blog-lang-es">
+      <div class="blog-language-toggle" data-current-language="en">
+        <input type="radio" name="blog-language" id="blog-lang-en" value="en" checked>
+        <input type="radio" name="blog-language" id="blog-lang-es" value="es">
 
         <div class="blog-language-toggle-controls">
           <label for="blog-lang-en" class="blog-lang-button">ENGLISH</label>
           <label for="blog-lang-es" class="blog-lang-button">Espa&ntilde;ol</label>
         </div>
 
-        <section class="blog-language-panel blog-language-en">
-          <p class="hero-eyebrow">CREATIVE JOURNAL</p>
-          <h1 class="blog-title">Notes from the Studio</h1>
+        <section class="blog-language-panel blog-language-active">
+          <p class="hero-eyebrow" data-blog-field="eyebrow"></p>
+          <h1 class="blog-title" data-blog-field="title"></h1>
           <div class="blog-divider"></div>
-          <p class="blog-description">
-            A visual journal of daily work, reflections, experiments, music, ideas, and creative progress from the studio.
-          </p>
-        </section>
-
-        <section class="blog-language-panel blog-language-es">
-          <p class="hero-eyebrow">DIARIO CREATIVO</p>
-          <h1 class="blog-title">Notas desde el Estudio</h1>
-          <div class="blog-divider"></div>
-          <p class="blog-description">
-            Un diario visual del trabajo diario, reflexiones, experimentos, m&uacute;sica, ideas y avances creativos desde el estudio.
-          </p>
+          <p class="blog-description" data-blog-field="description"></p>
         </section>
       </div>
 
-      <section class="blog-grid">
-          <article class="blog-card">
-            <a href="posts/2026/2026-04-08-asi-comenzamos.html" class="blog-card-link">
-              <div class="blog-card-image" style="background-image: url('assets/images/blog/2026/2026-04-08-asi-comenzamos-cover.png');"></div>
-              <div class="blog-card-body">
-                <div class="blog-card-copy blog-card-copy-en">
-                  <p class="blog-card-meta">April 08, 2026 &middot; Studio Notes</p>
-                  <h2>That&#x27;s how we started...</h2>
-                  <p class="blog-card-excerpt">
-                    This article introduces a deeply reflective platform created to showcase original work and artistic evolution. It emphasizes the independence and intentionality behind the project, highlighting its commitment to providing unique, high-quality content that serves both artistic and educational purposes.
-                  </p>
-                </div>
-                <div class="blog-card-copy blog-card-copy-es">
-                  <p class="blog-card-meta">8 de abril de 2026 &middot; Notas del Estudio</p>
-                  <h2>Así comenzamos...</h2>
-                  <p class="blog-card-excerpt">
-                    Este blog es el resultado de un intenso proceso creativo y reflexivo, donde se entrelazan la estética personal y un propósito significativo. Aquí se compartirán investigaciones y reflexiones que emergen de un compromiso profundo con la originalidad y la independencia, ofreciendo contenido de alta calidad y una experiencia enriquecedora para quienes buscan crecer y aprender.
-                  </p>
-                </div>
-              </div>
-            </a>
-          </article>
-          <article class="blog-card">
-            <a href="posts/2026/2026-04-08-bienvenido.html" class="blog-card-link">
-              <div class="blog-card-image" style="background-image: url('assets/images/blog/default-post-cover.jpg');"></div>
-              <div class="blog-card-body">
-                <div class="blog-card-copy blog-card-copy-en">
-                  <p class="blog-card-meta">April 08, 2026 &middot; Studio Notes</p>
-                  <h2>Welcome</h2>
-                  <p class="blog-card-excerpt">
-                    This article introduces a thoughtfully crafted platform designed to share original work, research, and artistic insights. Emphasizing independence and quality, it aims to provide meaningful resources that support artistic growth and education.
-                  </p>
-                </div>
-                <div class="blog-card-copy blog-card-copy-es">
-                  <p class="blog-card-meta">8 de abril de 2026 &middot; Notas del Estudio</p>
-                  <h2>Bienvenido</h2>
-                  <p class="blog-card-excerpt">
-                    Este espacio surge como un proyecto singular, donde se entrelazan la creatividad, la independencia y un profundo compromiso con la calidad. Aquí encontrarás reflexiones, investigaciones y herramientas educativas diseñadas para enriquecer tanto el proceso artístico como el aprendizaje.
-                  </p>
-                </div>
-              </div>
-            </a>
-          </article>
-        <article class="blog-card">
-          <a href="post-template.html" class="blog-card-link">
-            <div class="blog-card-image blog-card-image-placeholder"></div>
-            <div class="blog-card-body">
-              <p class="blog-card-meta">March 22, 2026 &middot; Studio Notes</p>
-              <h2>Building a More Beautiful Creative Platform</h2>
-              <p class="blog-card-excerpt">
-                A short reflection about shaping the visual identity of the site, refining layouts, and building a space that feels truly personal.
-              </p>
-            </div>
-          </a>
-        </article>
-
-        <article class="blog-card">
-          <a href="#" class="blog-card-link">
-            <div class="blog-card-image blog-card-image-placeholder"></div>
-            <div class="blog-card-body">
-              <p class="blog-card-meta">Coming Soon</p>
-              <h2>Future Entry</h2>
-              <p class="blog-card-excerpt">
-                Reserved for the next article in Notes from the Studio.
-              </p>
-            </div>
-          </a>
-        </article>
-
-        <article class="blog-card">
-          <a href="#" class="blog-card-link">
-            <div class="blog-card-image blog-card-image-placeholder"></div>
-            <div class="blog-card-body">
-              <p class="blog-card-meta">Coming Soon</p>
-              <h2>Future Entry</h2>
-              <p class="blog-card-excerpt">
-                Reserved for the next article in Notes from the Studio.
-              </p>
-            </div>
-          </a>
-        </article>
-      </section>
+      <section class="blog-grid" id="blog-grid" aria-live="polite"></section>
     </div>
   </main>
+
+  <script>
+    const blogContent = {
+      hero: {
+        eyebrow: {
+          en: "CREATIVE JOURNAL",
+          es: "DIARIO CREATIVO"
+        },
+        title: {
+          en: "Notes from the Studio",
+          es: "Notas desde el Estudio"
+        },
+        description: {
+          en: "A visual journal of daily work, reflections, experiments, music, ideas, and creative progress from the studio.",
+          es: "Un diario visual del trabajo diario, reflexiones, experimentos, m\u00fasica, ideas y avances creativos desde el estudio."
+        }
+      },
+      empty: {
+        en: "No posts published yet.",
+        es: "A\u00fan no hay publicaciones."
+      },
+      posts: []
+    };
+
+    let currentLanguage = "en";
+
+    const blogToggle = document.querySelector(".blog-language-toggle");
+    const blogGrid = document.getElementById("blog-grid");
+    const languageInputs = document.querySelectorAll('input[name="blog-language"]');
+    const heroFields = {
+      eyebrow: document.querySelector('[data-blog-field="eyebrow"]'),
+      title: document.querySelector('[data-blog-field="title"]'),
+      description: document.querySelector('[data-blog-field="description"]')
+    };
+
+    function createBlogCard(post, language) {
+      const article = document.createElement("article");
+      article.className = "blog-card";
+
+      const link = document.createElement("a");
+      link.className = "blog-card-link";
+      link.href = post.href;
+
+      const image = document.createElement("div");
+      image.className = "blog-card-image";
+      image.style.backgroundImage = "url('" + post.image + "')";
+      image.setAttribute("aria-hidden", "true");
+
+      const body = document.createElement("div");
+      body.className = "blog-card-body";
+
+      const meta = document.createElement("p");
+      meta.className = "blog-card-meta";
+      meta.textContent = post.meta[language];
+
+      const title = document.createElement("h2");
+      title.textContent = post.title[language];
+
+      const excerpt = document.createElement("p");
+      excerpt.className = "blog-card-excerpt";
+      excerpt.textContent = post.excerpt[language];
+
+      body.append(meta, title, excerpt);
+      link.append(image, body);
+      article.appendChild(link);
+
+      return article;
+    }
+
+    function createEmptyState(language) {
+      const emptyState = document.createElement("article");
+      emptyState.className = "blog-empty-state";
+
+      const message = document.createElement("p");
+      message.className = "blog-empty-state-message";
+      message.textContent = blogContent.empty[language];
+
+      emptyState.appendChild(message);
+      return emptyState;
+    }
+
+    function renderBlog(language) {
+      currentLanguage = language;
+      blogToggle.dataset.currentLanguage = language;
+      document.documentElement.lang = language;
+      document.title = blogContent.hero.title[language] + " | Carlos Acevedo Studio";
+
+      heroFields.eyebrow.textContent = blogContent.hero.eyebrow[language];
+      heroFields.title.textContent = blogContent.hero.title[language];
+      heroFields.description.textContent = blogContent.hero.description[language];
+
+      const fragment = document.createDocumentFragment();
+      if (blogContent.posts.length === 0) {
+        fragment.appendChild(createEmptyState(language));
+      } else {
+        blogContent.posts.forEach((post) => {
+          fragment.appendChild(createBlogCard(post, language));
+        });
+      }
+
+      blogGrid.replaceChildren(fragment);
+    }
+
+    languageInputs.forEach((input) => {
+      input.addEventListener("change", (event) => {
+        if (event.target.checked) {
+          renderBlog(event.target.value);
+        }
+      });
+    });
+
+    renderBlog(currentLanguage);
+  </script>
 </body>
 </html>
-
