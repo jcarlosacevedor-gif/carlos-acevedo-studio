@@ -1,0 +1,13 @@
+{
+  "title": "Prueba 1",
+  "title_es": "Prueba 1",
+  "title_en": "Test 1",
+  "content_es": "Este es un artículo de prueba.",
+  "content_en": "This is a test article.",
+  "card_summary_es": "Descubre un enfoque reflexivo sobre diversos temas que invitan a la contemplación y el análisis. Un espacio para explorar ideas y perspectivas que fomentan el diálogo y la conexión entre los lectores.",
+  "card_summary_en": "This article serves as a preliminary exploration of a topic, providing foundational insights and a glimpse into further discussion. Its straightforward approach invites readers to engage with the subject matter.",
+  "tags": [
+    "prueba"
+  ],
+  "post_path": "posts/2026/2026-04-09-prueba-1.html"
+}
