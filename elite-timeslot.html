@@ -40,11 +40,12 @@
           </p>
 
           <form class="timeslot-form" id="timeslot-request-en" action="https://formspree.io/f/mdapdjbd" method="POST">
+            <input type="hidden" name="_redirect" value="/thank-you.html">
             <section class="timeslot-availability">
               <h2 class="timeslot-section-title">Available Timeslots</h2>
               <p class="timeslot-hint">Select one or more preferred slots</p>
               <p class="timeslot-section-copy">
-                These are the currently available fixed weekly windows shown in Mexico City time. Each selected weekly slot has a monthly cost of $142 USD.
+                These are the currently available fixed weekly windows shown in Mexico City time. Each selected weekly slot has a monthly cost of $192 USD.
               </p>
 
               <div class="timeslot-day-groups">
@@ -53,12 +54,12 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Monday 4:00 PM to 5:30 PM">
-                      <span>Monday &middot; 4:00 PM</span>
+                      <span>Monday 4:00 PM - 5:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Monday 8:30 PM to 10:00 PM">
-                      <span>Monday &middot; 8:30 PM</span>
+                      <span>Monday 8:30 PM - 10:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -68,27 +69,27 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 9:30 AM to 11:00 AM">
-                      <span>Tuesday &middot; 9:30 AM</span>
+                      <span>Tuesday 9:30 AM - 11:00 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 11:00 AM to 12:30 PM">
-                      <span>Tuesday &middot; 11:00 AM</span>
+                      <span>Tuesday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 12:30 PM to 2:00 PM">
-                      <span>Tuesday &middot; 12:30 PM</span>
+                      <span>Tuesday 12:30 PM - 2:00 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 7:00 PM to 8:30 PM">
-                      <span>Tuesday &middot; 7:00 PM</span>
+                      <span>Tuesday 7:00 PM - 8:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 8:30 PM to 10:00 PM">
-                      <span>Tuesday &middot; 8:30 PM</span>
+                      <span>Tuesday 8:30 PM - 10:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -98,27 +99,27 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:00 AM to 9:30 AM">
-                      <span>Wednesday &middot; 8:00 AM</span>
+                      <span>Wednesday 8:00 AM - 9:30 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 9:30 AM to 11:00 AM">
-                      <span>Wednesday &middot; 9:30 AM</span>
+                      <span>Wednesday 9:30 AM - 11:00 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 11:00 AM to 12:30 PM">
-                      <span>Wednesday &middot; 11:00 AM</span>
+                      <span>Wednesday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 4:00 PM to 5:30 PM">
-                      <span>Wednesday &middot; 4:00 PM</span>
+                      <span>Wednesday 4:00 PM - 5:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:30 PM to 10:00 PM">
-                      <span>Wednesday &middot; 8:30 PM</span>
+                      <span>Wednesday 8:30 PM - 10:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -128,17 +129,17 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Thursday 9:30 AM to 11:00 AM">
-                      <span>Thursday &middot; 9:30 AM</span>
+                      <span>Thursday 9:30 AM - 11:00 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Thursday 11:00 AM to 12:30 PM">
-                      <span>Thursday &middot; 11:00 AM</span>
+                      <span>Thursday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Thursday 12:30 PM to 2:00 PM">
-                      <span>Thursday &middot; 12:30 PM</span>
+                      <span>Thursday 12:30 PM - 2:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -147,23 +148,28 @@
                   <summary class="timeslot-day-summary">Friday</summary>
                   <div class="timeslot-options">
                     <label class="timeslot-option">
+                      <input type="checkbox" name="preferred_timeslot" value="Friday 9:30 AM to 11:00 AM">
+                      <span>Friday 9:30 AM - 11:00 AM</span>
+                    </label>
+
+                    <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 11:00 AM to 12:30 PM">
-                      <span>Friday &middot; 11:00 AM</span>
+                      <span>Friday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 12:30 PM to 2:00 PM">
-                      <span>Friday &middot; 12:30 PM</span>
+                      <span>Friday 12:30 PM - 2:00 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 7:00 PM to 8:30 PM">
-                      <span>Friday &middot; 7:00 PM</span>
+                      <span>Friday 7:00 PM - 8:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 10:00 PM to 11:30 PM">
-                      <span>Friday &middot; 10:00 PM</span>
+                      <span>Friday 10:00 PM - 11:30 PM</span>
                     </label>
                   </div>
                 </details>
@@ -173,17 +179,17 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Saturday 8:00 AM to 9:30 AM">
-                      <span>Saturday &middot; 8:00 AM</span>
+                      <span>Saturday 8:00 AM - 9:30 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Saturday 12:30 PM to 2:00 PM">
-                      <span>Saturday &middot; 12:30 PM</span>
+                      <span>Saturday 12:30 PM - 2:00 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Saturday 4:00 PM to 5:30 PM">
-                      <span>Saturday &middot; 4:00 PM</span>
+                      <span>Saturday 4:00 PM - 5:30 PM</span>
                     </label>
                   </div>
                 </details>
@@ -237,11 +243,12 @@
           </p>
 
           <form class="timeslot-form" id="timeslot-request-es" action="https://formspree.io/f/mdapdjbd" method="POST">
+            <input type="hidden" name="_redirect" value="/thank-you.html">
             <section class="timeslot-availability">
               <h2 class="timeslot-section-title">Horarios Disponibles</h2>
               <p class="timeslot-hint">Selecciona uno o m&aacute;s horarios preferidos</p>
               <p class="timeslot-section-copy">
-                Estos son los horarios fijos semanales disponibles, mostrados en hora de la Ciudad de M&eacute;xico. Cada horario seleccionado tiene un costo mensual de $142 USD.
+                Estos son los horarios fijos semanales disponibles, mostrados en hora de la Ciudad de M&eacute;xico. Cada horario seleccionado tiene un costo mensual de $192 USD.
               </p>
 
               <div class="timeslot-day-groups">
@@ -250,12 +257,12 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Monday 4:00 PM to 5:30 PM">
-                      <span>Monday &middot; 4:00 PM</span>
+                      <span>Monday 4:00 PM - 5:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Monday 8:30 PM to 10:00 PM">
-                      <span>Monday &middot; 8:30 PM</span>
+                      <span>Monday 8:30 PM - 10:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -265,27 +272,27 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 9:30 AM to 11:00 AM">
-                      <span>Tuesday &middot; 9:30 AM</span>
+                      <span>Tuesday 9:30 AM - 11:00 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 11:00 AM to 12:30 PM">
-                      <span>Tuesday &middot; 11:00 AM</span>
+                      <span>Tuesday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 12:30 PM to 2:00 PM">
-                      <span>Tuesday &middot; 12:30 PM</span>
+                      <span>Tuesday 12:30 PM - 2:00 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 7:00 PM to 8:30 PM">
-                      <span>Tuesday &middot; 7:00 PM</span>
+                      <span>Tuesday 7:00 PM - 8:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Tuesday 8:30 PM to 10:00 PM">
-                      <span>Tuesday &middot; 8:30 PM</span>
+                      <span>Tuesday 8:30 PM - 10:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -295,27 +302,27 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:00 AM to 9:30 AM">
-                      <span>Wednesday &middot; 8:00 AM</span>
+                      <span>Wednesday 8:00 AM - 9:30 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 9:30 AM to 11:00 AM">
-                      <span>Wednesday &middot; 9:30 AM</span>
+                      <span>Wednesday 9:30 AM - 11:00 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 11:00 AM to 12:30 PM">
-                      <span>Wednesday &middot; 11:00 AM</span>
+                      <span>Wednesday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 4:00 PM to 5:30 PM">
-                      <span>Wednesday &middot; 4:00 PM</span>
+                      <span>Wednesday 4:00 PM - 5:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:30 PM to 10:00 PM">
-                      <span>Wednesday &middot; 8:30 PM</span>
+                      <span>Wednesday 8:30 PM - 10:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -325,17 +332,17 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Thursday 9:30 AM to 11:00 AM">
-                      <span>Thursday &middot; 9:30 AM</span>
+                      <span>Thursday 9:30 AM - 11:00 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Thursday 11:00 AM to 12:30 PM">
-                      <span>Thursday &middot; 11:00 AM</span>
+                      <span>Thursday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Thursday 12:30 PM to 2:00 PM">
-                      <span>Thursday &middot; 12:30 PM</span>
+                      <span>Thursday 12:30 PM - 2:00 PM</span>
                     </label>
                   </div>
                 </details>
@@ -344,23 +351,28 @@
                   <summary class="timeslot-day-summary">Friday</summary>
                   <div class="timeslot-options">
                     <label class="timeslot-option">
+                      <input type="checkbox" name="preferred_timeslot" value="Friday 9:30 AM to 11:00 AM">
+                      <span>Friday 9:30 AM - 11:00 AM</span>
+                    </label>
+
+                    <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 11:00 AM to 12:30 PM">
-                      <span>Friday &middot; 11:00 AM</span>
+                      <span>Friday 11:00 AM - 12:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 12:30 PM to 2:00 PM">
-                      <span>Friday &middot; 12:30 PM</span>
+                      <span>Friday 12:30 PM - 2:00 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 7:00 PM to 8:30 PM">
-                      <span>Friday &middot; 7:00 PM</span>
+                      <span>Friday 7:00 PM - 8:30 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Friday 10:00 PM to 11:30 PM">
-                      <span>Friday &middot; 10:00 PM</span>
+                      <span>Friday 10:00 PM - 11:30 PM</span>
                     </label>
                   </div>
                 </details>
@@ -370,17 +382,17 @@
                   <div class="timeslot-options">
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Saturday 8:00 AM to 9:30 AM">
-                      <span>Saturday &middot; 8:00 AM</span>
+                      <span>Saturday 8:00 AM - 9:30 AM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Saturday 12:30 PM to 2:00 PM">
-                      <span>Saturday &middot; 12:30 PM</span>
+                      <span>Saturday 12:30 PM - 2:00 PM</span>
                     </label>
 
                     <label class="timeslot-option">
                       <input type="checkbox" name="preferred_timeslot" value="Saturday 4:00 PM to 5:30 PM">
-                      <span>Saturday &middot; 4:00 PM</span>
+                      <span>Saturday 4:00 PM - 5:30 PM</span>
                     </label>
                   </div>
                 </details>
