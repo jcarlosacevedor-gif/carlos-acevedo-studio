@@ -43,162 +43,79 @@
             <input type="hidden" name="_language" value="en">
             <input type="hidden" name="_redirect" value="/thank-you.html">
             <section class="timeslot-availability">
-              <h2 class="timeslot-section-title">Available Timeslots</h2>
-              <p class="timeslot-hint">Select one or more preferred slots</p>
-              <p class="timeslot-section-copy">
-                These are the currently available fixed weekly windows shown in Mexico City time. Each selected weekly slot has a monthly cost of $192 USD.
-              </p>
-
-              <div class="timeslot-day-groups">
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Monday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Monday 4:00 PM to 5:30 PM">
-                      <span>Monday 4:00 PM - 5:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Monday 8:30 PM to 10:00 PM">
-                      <span>Monday 8:30 PM - 10:00 PM</span>
-                    </label>
+              <div class="timeslot-booking-layout">
+                <div class="timeslot-booking-main">
+                  <div class="timeslot-step-header">
+                    <p class="timeslot-step-label">STEP 1</p>
+                    <h2 class="timeslot-section-title">1. Choose Your Timeslots</h2>
+                    <p class="timeslot-section-copy">
+                      Select one or more fixed weekly timeslots.
+                    </p>
+                    <p class="timeslot-price-note">Each selected timeslot has a monthly cost of <strong>192 USD</strong>.</p>
                   </div>
-                </details>
 
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Tuesday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 9:30 AM to 11:00 AM">
-                      <span>Tuesday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 11:00 AM to 12:30 PM">
-                      <span>Tuesday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 12:30 PM to 2:00 PM">
-                      <span>Tuesday 12:30 PM - 2:00 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 7:00 PM to 8:30 PM">
-                      <span>Tuesday 7:00 PM - 8:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 8:30 PM to 10:00 PM">
-                      <span>Tuesday 8:30 PM - 10:00 PM</span>
-                    </label>
+                  <div class="timeslot-planner-shell">
+                    <table class="timeslot-planner" data-timeslot-planner></table>
                   </div>
-                </details>
+                </div>
 
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Wednesday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:00 AM to 9:30 AM">
-                      <span>Wednesday 8:00 AM - 9:30 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 9:30 AM to 11:00 AM">
-                      <span>Wednesday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 11:00 AM to 12:30 PM">
-                      <span>Wednesday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 4:00 PM to 5:30 PM">
-                      <span>Wednesday 4:00 PM - 5:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:30 PM to 10:00 PM">
-                      <span>Wednesday 8:30 PM - 10:00 PM</span>
-                    </label>
+                <aside class="timeslot-booking-sidebar">
+                  <div class="timeslot-summary" data-timeslot-summary>
+                    <div class="timeslot-summary-header">
+                      <div>
+                        <p class="timeslot-summary-kicker"><img src="assets/icons/calendar.png" alt="" class="timeslot-icon timeslot-icon-calendar">Reservation Summary</p>
+                        <h3>Review your reservation</h3>
+                      </div>
+                      <p class="timeslot-summary-count">Selected timeslots: <strong data-timeslot-summary-count>0</strong></p>
+                    </div>
+                    <ul class="timeslot-summary-list" data-timeslot-summary-list>
+                      <li class="timeslot-summary-empty">No timeslots selected yet.</li>
+                    </ul>
+                    <div class="timeslot-summary-meta">
+                      <div class="timeslot-summary-meta-row">
+                        <span>Price per timeslot</span>
+                        <strong>192 USD</strong>
+                      </div>
+                    </div>
+                    <div class="timeslot-summary-total">
+                      <span>Monthly total</span>
+                      <strong data-timeslot-summary-total>0 USD</strong>
+                    </div>
                   </div>
-                </details>
+                </aside>
+              </div>
 
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Thursday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Thursday 9:30 AM to 11:00 AM">
-                      <span>Thursday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Thursday 11:00 AM to 12:30 PM">
-                      <span>Thursday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Thursday 12:30 PM to 2:00 PM">
-                      <span>Thursday 12:30 PM - 2:00 PM</span>
-                    </label>
-                  </div>
-                </details>
-
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Friday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 9:30 AM to 11:00 AM">
-                      <span>Friday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 11:00 AM to 12:30 PM">
-                      <span>Friday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 12:30 PM to 2:00 PM">
-                      <span>Friday 12:30 PM - 2:00 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 7:00 PM to 8:30 PM">
-                      <span>Friday 7:00 PM - 8:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 10:00 PM to 11:30 PM">
-                      <span>Friday 10:00 PM - 11:30 PM</span>
-                    </label>
-                  </div>
-                </details>
-
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Saturday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Saturday 8:00 AM to 9:30 AM">
-                      <span>Saturday 8:00 AM - 9:30 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Saturday 12:30 PM to 2:00 PM">
-                      <span>Saturday 12:30 PM - 2:00 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Saturday 4:00 PM to 5:30 PM">
-                      <span>Saturday 4:00 PM - 5:30 PM</span>
-                    </label>
-                  </div>
-                </details>
+              <div class="timeslot-hidden-fields" aria-hidden="true">
+                <input type="checkbox" name="preferred_timeslot" value="Monday 4:00 PM to 5:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Monday 8:30 PM to 10:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 12:30 PM to 2:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 2:00 PM to 3:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 7:00 PM to 8:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 8:30 PM to 10:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:00 AM to 9:30 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 2:00 PM to 3:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 4:00 PM to 5:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:30 PM to 10:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Thursday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Thursday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Thursday 12:30 PM to 2:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 12:30 PM to 2:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 2:00 PM to 3:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 7:00 PM to 8:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 10:00 PM to 11:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Saturday 8:00 AM to 9:30 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Saturday 12:30 PM to 2:00 PM">
               </div>
             </section>
 
             <section class="timeslot-form-section">
-              <h2 class="timeslot-section-title">Request Your Timeslot</h2>
+              <h2 class="timeslot-section-title">2. Submit Your Request</h2>
               <p class="timeslot-section-copy">
                 Tell me your name, your email, what you would like to study, and the weekly slot you would like to reserve.
               </p>
@@ -220,16 +137,11 @@
                 <textarea id="study-focus-en" name="study_focus" rows="4" placeholder="Tell me what you would like to learn or improve"></textarea>
               </div>
 
-              <div class="timeslot-field">
-                <label for="notes-en">Additional Notes</label>
-                <textarea id="notes-en" name="additional_notes" rows="4" placeholder="Any extra details you would like to share"></textarea>
-              </div>
-
               <input type="hidden" name="request_language" value="English">
               <p class="timeslot-hint">Requests are reviewed and confirmed manually after submission.</p>
 
               <div class="timeslot-actions">
-                <button type="submit" class="button button-primary">Request This Timeslot</button>
+                <button type="submit" class="button button-primary"><img src="assets/icons/paper-plane.png" alt="" class="timeslot-icon timeslot-icon-send">Submit Request</button>
               </div>
             </section>
           </form>
@@ -247,162 +159,79 @@
             <input type="hidden" name="_language" value="es">
             <input type="hidden" name="_redirect" value="/thank-you.html">
             <section class="timeslot-availability">
-              <h2 class="timeslot-section-title">Horarios Disponibles</h2>
-              <p class="timeslot-hint">Selecciona uno o m&aacute;s horarios preferidos</p>
-              <p class="timeslot-section-copy">
-                Estos son los horarios fijos semanales disponibles, mostrados en hora de la Ciudad de M&eacute;xico. Cada horario seleccionado tiene un costo mensual de $192 USD.
-              </p>
-
-              <div class="timeslot-day-groups">
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Monday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Monday 4:00 PM to 5:30 PM">
-                      <span>Monday 4:00 PM - 5:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Monday 8:30 PM to 10:00 PM">
-                      <span>Monday 8:30 PM - 10:00 PM</span>
-                    </label>
+              <div class="timeslot-booking-layout">
+                <div class="timeslot-booking-main">
+                  <div class="timeslot-step-header">
+                    <p class="timeslot-step-label">PASO 1</p>
+                    <h2 class="timeslot-section-title">1. Elige tus horarios</h2>
+                    <p class="timeslot-section-copy">
+                      Selecciona uno o m&aacute;s horarios fijos semanales.
+                    </p>
+                    <p class="timeslot-price-note">Cada horario seleccionado tiene un costo mensual de <strong>192 USD</strong>.</p>
                   </div>
-                </details>
 
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Tuesday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 9:30 AM to 11:00 AM">
-                      <span>Tuesday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 11:00 AM to 12:30 PM">
-                      <span>Tuesday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 12:30 PM to 2:00 PM">
-                      <span>Tuesday 12:30 PM - 2:00 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 7:00 PM to 8:30 PM">
-                      <span>Tuesday 7:00 PM - 8:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Tuesday 8:30 PM to 10:00 PM">
-                      <span>Tuesday 8:30 PM - 10:00 PM</span>
-                    </label>
+                  <div class="timeslot-planner-shell">
+                    <table class="timeslot-planner" data-timeslot-planner></table>
                   </div>
-                </details>
+                </div>
 
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Wednesday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:00 AM to 9:30 AM">
-                      <span>Wednesday 8:00 AM - 9:30 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 9:30 AM to 11:00 AM">
-                      <span>Wednesday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 11:00 AM to 12:30 PM">
-                      <span>Wednesday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 4:00 PM to 5:30 PM">
-                      <span>Wednesday 4:00 PM - 5:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:30 PM to 10:00 PM">
-                      <span>Wednesday 8:30 PM - 10:00 PM</span>
-                    </label>
+                <aside class="timeslot-booking-sidebar">
+                  <div class="timeslot-summary" data-timeslot-summary>
+                    <div class="timeslot-summary-header">
+                      <div>
+                        <p class="timeslot-summary-kicker"><img src="assets/icons/calendar.png" alt="" class="timeslot-icon timeslot-icon-calendar">Resumen de tu reserva</p>
+                        <h3>Revisa tu reserva</h3>
+                      </div>
+                      <p class="timeslot-summary-count">Horarios seleccionados: <strong data-timeslot-summary-count>0</strong></p>
+                    </div>
+                    <ul class="timeslot-summary-list" data-timeslot-summary-list>
+                      <li class="timeslot-summary-empty">A&uacute;n no has seleccionado horarios.</li>
+                    </ul>
+                    <div class="timeslot-summary-meta">
+                      <div class="timeslot-summary-meta-row">
+                        <span>Precio por horario</span>
+                        <strong>192 USD</strong>
+                      </div>
+                    </div>
+                    <div class="timeslot-summary-total">
+                      <span>Mensualidad</span>
+                      <strong data-timeslot-summary-total>0 USD</strong>
+                    </div>
                   </div>
-                </details>
+                </aside>
+              </div>
 
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Thursday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Thursday 9:30 AM to 11:00 AM">
-                      <span>Thursday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Thursday 11:00 AM to 12:30 PM">
-                      <span>Thursday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Thursday 12:30 PM to 2:00 PM">
-                      <span>Thursday 12:30 PM - 2:00 PM</span>
-                    </label>
-                  </div>
-                </details>
-
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Friday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 9:30 AM to 11:00 AM">
-                      <span>Friday 9:30 AM - 11:00 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 11:00 AM to 12:30 PM">
-                      <span>Friday 11:00 AM - 12:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 12:30 PM to 2:00 PM">
-                      <span>Friday 12:30 PM - 2:00 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 7:00 PM to 8:30 PM">
-                      <span>Friday 7:00 PM - 8:30 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Friday 10:00 PM to 11:30 PM">
-                      <span>Friday 10:00 PM - 11:30 PM</span>
-                    </label>
-                  </div>
-                </details>
-
-                <details class="timeslot-day">
-                  <summary class="timeslot-day-summary">Saturday</summary>
-                  <div class="timeslot-options">
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Saturday 8:00 AM to 9:30 AM">
-                      <span>Saturday 8:00 AM - 9:30 AM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Saturday 12:30 PM to 2:00 PM">
-                      <span>Saturday 12:30 PM - 2:00 PM</span>
-                    </label>
-
-                    <label class="timeslot-option">
-                      <input type="checkbox" name="preferred_timeslot" value="Saturday 4:00 PM to 5:30 PM">
-                      <span>Saturday 4:00 PM - 5:30 PM</span>
-                    </label>
-                  </div>
-                </details>
+              <div class="timeslot-hidden-fields" aria-hidden="true">
+                <input type="checkbox" name="preferred_timeslot" value="Monday 4:00 PM to 5:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Monday 8:30 PM to 10:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 12:30 PM to 2:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 2:00 PM to 3:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 7:00 PM to 8:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Tuesday 8:30 PM to 10:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:00 AM to 9:30 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 2:00 PM to 3:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 4:00 PM to 5:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Wednesday 8:30 PM to 10:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Thursday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Thursday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Thursday 12:30 PM to 2:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 9:30 AM to 11:00 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 11:00 AM to 12:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 12:30 PM to 2:00 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 2:00 PM to 3:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 7:00 PM to 8:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Friday 10:00 PM to 11:30 PM">
+                <input type="checkbox" name="preferred_timeslot" value="Saturday 8:00 AM to 9:30 AM">
+                <input type="checkbox" name="preferred_timeslot" value="Saturday 12:30 PM to 2:00 PM">
               </div>
             </section>
 
             <section class="timeslot-form-section">
-              <h2 class="timeslot-section-title">Solicita tu Horario</h2>
+              <h2 class="timeslot-section-title">2. Haz tu solicitud</h2>
               <p class="timeslot-section-copy">
                 Dime tu nombre, tu correo, qu&eacute; te gustar&iacute;a estudiar y el horario semanal que te gustar&iacute;a reservar.
               </p>
@@ -424,16 +253,11 @@
                 <textarea id="study-focus-es" name="study_focus" rows="4" placeholder="Cu&eacute;ntame qu&eacute; te gustar&iacute;a aprender o mejorar"></textarea>
               </div>
 
-              <div class="timeslot-field">
-                <label for="notes-es">Notas Adicionales</label>
-                <textarea id="notes-es" name="additional_notes" rows="4" placeholder="Cualquier detalle extra que quieras compartir"></textarea>
-              </div>
-
               <input type="hidden" name="request_language" value="Espa&ntilde;ol">
               <p class="timeslot-hint">Las solicitudes se revisan y confirman manualmente despu&eacute;s del env&iacute;o.</p>
 
               <div class="timeslot-actions">
-                <button type="submit" class="button button-primary">Solicitar este horario</button>
+                <button type="submit" class="button button-primary"><img src="assets/icons/paper-plane.png" alt="" class="timeslot-icon timeslot-icon-send">Enviar solicitud</button>
               </div>
             </section>
           </form>
@@ -442,5 +266,256 @@
       </div>
     </section>
   </main>
+  <script>
+    const TIMESLOT_PRICE = 192;
+    const TIMESLOT_DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const TIMESLOT_VISIBLE_STARTS = ["8:00 AM", "9:30 AM", "11:00 AM", "12:30 PM", "2:00 PM", "4:00 PM", "5:30 PM", "7:00 PM", "8:30 PM", "10:00 PM"];
+    const TIMESLOT_COPY = {
+      en: {
+        dayLabels: {
+          Monday: "Monday",
+          Tuesday: "Tuesday",
+          Wednesday: "Wednesday",
+          Thursday: "Thursday",
+          Friday: "Friday",
+          Saturday: "Saturday"
+        },
+        available: "Available",
+        selected: "Selected",
+        reserved: "Taken",
+        slotMeta: "90 min",
+        empty: "No timeslots selected yet.",
+        timeLabel: "Time",
+        summaryItem: "Selected timeslots",
+        totalLabel: "Monthly total"
+      },
+      es: {
+        dayLabels: {
+          Monday: "Lunes",
+          Tuesday: "Martes",
+          Wednesday: "Mi\u00e9rcoles",
+          Thursday: "Jueves",
+          Friday: "Viernes",
+          Saturday: "S\u00e1bado"
+        },
+        available: "Disponible",
+        selected: "Seleccionado",
+        reserved: "Reservado",
+        slotMeta: "90 min",
+        empty: "A\u00fan no has seleccionado horarios.",
+        timeLabel: "Hora",
+        summaryItem: "Horarios seleccionados",
+        totalLabel: "Mensualidad"
+      }
+    };
+
+    function parseTimeToMinutes(label) {
+      const [time, meridiem] = label.split(" ");
+      const [hoursText, minutesText] = time.split(":");
+      let hours = Number(hoursText);
+      const minutes = Number(minutesText);
+
+      if (meridiem === "PM" && hours !== 12) {
+        hours += 12;
+      }
+
+      if (meridiem === "AM" && hours === 12) {
+        hours = 0;
+      }
+
+      return (hours * 60) + minutes;
+    }
+
+    function parseTimeslotValue(value) {
+      const match = value.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\s(.+?)\s(?:to|-)\s(.+)$/);
+      if (!match) {
+        return null;
+      }
+
+      return {
+        day: match[1],
+        start: match[2],
+        end: match[3]
+      };
+    }
+
+    function createReservedSlot(day, start) {
+      return {
+        day,
+        start,
+        input: {
+          checked: false,
+          disabled: true
+        }
+      };
+    }
+
+    function createPlannerCell(slot, copy) {
+      if (!slot) {
+        const emptyCell = document.createElement("td");
+        emptyCell.className = "timeslot-planner-empty";
+        emptyCell.textContent = "-";
+        return emptyCell;
+      }
+
+      const cell = document.createElement("td");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "timeslot-slot-button";
+      button.disabled = slot.input.disabled;
+
+      const state = document.createElement("span");
+      state.className = "timeslot-slot-state";
+      state.dataset.timeslotSlotState = "";
+
+      const icon = document.createElement("img");
+      icon.src = "assets/icons/padlock.png";
+      icon.alt = "";
+      icon.className = "timeslot-icon timeslot-icon-lock";
+      icon.setAttribute("aria-hidden", "true");
+
+      const range = document.createElement("span");
+      range.className = "timeslot-slot-meta";
+      range.textContent = copy.slotMeta;
+
+      button.append(icon, state, range);
+
+      if (!slot.input.disabled) {
+        button.addEventListener("click", () => {
+          slot.input.checked = !slot.input.checked;
+          slot.input.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      }
+
+      slot.button = button;
+      syncPlannerButton(slot, copy);
+      cell.appendChild(button);
+      return cell;
+    }
+
+    function syncPlannerButton(slot, copy) {
+      if (!slot.button) {
+        return;
+      }
+
+      if (slot.input.disabled) {
+        slot.button.dataset.state = "reserved";
+        slot.button.setAttribute("aria-disabled", "true");
+        slot.button.querySelector("[data-timeslot-slot-state]").textContent = copy.reserved;
+        return;
+      }
+
+      const selected = slot.input.checked;
+      slot.button.dataset.state = selected ? "selected" : "available";
+      slot.button.setAttribute("aria-pressed", String(selected));
+      slot.button.querySelector("[data-timeslot-slot-state]").textContent = selected ? copy.selected : copy.available;
+    }
+
+    function buildTimeslotPlanner(form) {
+      const language = form.querySelector('input[name="_language"]').value === "es" ? "es" : "en";
+      const copy = TIMESLOT_COPY[language];
+      const planner = form.querySelector("[data-timeslot-planner]");
+      const inputs = Array.from(form.querySelectorAll('.timeslot-hidden-fields input[name="preferred_timeslot"]'));
+      const slots = [];
+      const slotMap = new Map();
+
+      inputs.forEach((input) => {
+        const parsed = parseTimeslotValue(input.value);
+        if (!parsed) {
+          return;
+        }
+
+        const slot = { ...parsed, input };
+        slots.push(slot);
+        slotMap.set(parsed.day + "|" + parsed.start, slot);
+      });
+
+      const uniqueTimes = Array.from(new Set([...TIMESLOT_VISIBLE_STARTS, ...slots.map((slot) => slot.start)]))
+        .sort((a, b) => parseTimeToMinutes(a) - parseTimeToMinutes(b));
+
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      const corner = document.createElement("th");
+      corner.scope = "col";
+      corner.textContent = copy.timeLabel;
+      headerRow.appendChild(corner);
+
+      TIMESLOT_DAY_ORDER.forEach((day) => {
+        const headerCell = document.createElement("th");
+        headerCell.scope = "col";
+        headerCell.textContent = copy.dayLabels[day];
+        headerRow.appendChild(headerCell);
+      });
+
+      thead.appendChild(headerRow);
+
+      const tbody = document.createElement("tbody");
+      uniqueTimes.forEach((time) => {
+        const row = document.createElement("tr");
+        const rowHeader = document.createElement("th");
+        rowHeader.scope = "row";
+        rowHeader.textContent = time;
+        row.appendChild(rowHeader);
+
+        TIMESLOT_DAY_ORDER.forEach((day) => {
+          const slotKey = day + "|" + time;
+          const slot = slotMap.get(slotKey) || createReservedSlot(day, time);
+          row.appendChild(createPlannerCell(slot, copy));
+        });
+
+        tbody.appendChild(row);
+      });
+
+      planner.replaceChildren(thead, tbody);
+
+      const summaryCount = form.querySelector("[data-timeslot-summary-count]");
+      const summaryList = form.querySelector("[data-timeslot-summary-list]");
+      const summaryTotal = form.querySelector("[data-timeslot-summary-total]");
+
+      function renderSummary() {
+        const selectedSlots = slots.filter((slot) => slot.input.checked);
+        const total = selectedSlots.length * TIMESLOT_PRICE;
+
+        slots.forEach((slot) => syncPlannerButton(slot, copy));
+        summaryCount.textContent = String(selectedSlots.length);
+        summaryTotal.textContent = total + " USD";
+
+        if (selectedSlots.length === 0) {
+          const emptyItem = document.createElement("li");
+          emptyItem.className = "timeslot-summary-empty";
+          emptyItem.textContent = copy.empty;
+          summaryList.replaceChildren(emptyItem);
+          return;
+        }
+
+        const items = selectedSlots
+          .sort((a, b) => {
+            const dayDiff = TIMESLOT_DAY_ORDER.indexOf(a.day) - TIMESLOT_DAY_ORDER.indexOf(b.day);
+            if (dayDiff !== 0) {
+              return dayDiff;
+            }
+
+            return parseTimeToMinutes(a.start) - parseTimeToMinutes(b.start);
+          })
+          .map((slot) => {
+            const item = document.createElement("li");
+            item.textContent = copy.dayLabels[slot.day] + " — " + slot.start;
+            return item;
+          });
+
+        summaryList.replaceChildren(...items);
+      }
+
+      inputs.forEach((input) => {
+        input.addEventListener("change", renderSummary);
+      });
+
+      renderSummary();
+    }
+
+    document.querySelectorAll(".timeslot-form").forEach((form) => {
+      buildTimeslotPlanner(form);
+    });
+  </script>
 </body>
 </html>
