@@ -17,6 +17,9 @@ PAYPAL_APPROVAL_HOSTS = {
     "live": frozenset({"www.paypal.com"}),
 }
 
+# Protocol constants used across PayPal client and order persistence layers
+REQUEST_ID_MAX_LENGTH = 108
+
 
 @dataclass(frozen=True)
 class PayPalConfig:

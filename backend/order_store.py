@@ -15,7 +15,8 @@ import sqlite3
 from typing import Any
 import uuid
 
-from .paypal_client import REQUEST_ID_MAX_LENGTH, validate_order_id
+from .config import REQUEST_ID_MAX_LENGTH
+from .paypal_client import validate_order_id
 
 
 STATUSES = frozenset({"PENDING", "PAYPAL_CREATED", "CAPTURING", "PAID", "FAILED", "CANCELLED"})

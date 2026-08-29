@@ -8,10 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
-from .config import ConfigurationError, PayPalConfig
-
-
-REQUEST_ID_MAX_LENGTH = 108
+from .config import ConfigurationError, PayPalConfig, REQUEST_ID_MAX_LENGTH
 ORDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9]{1,36}$")
 
 
@@ -69,6 +66,10 @@ class PayPalClient:
             with urlopen(request, timeout=self._timeout_seconds) as response:
                 raw_body = response.read()
         except HTTPError as error:
+            # HTTP 408/429/5xx are ambiguous for state-mutating operations:
+            # PayPal may have processed the request even if we did not get a reliable response.
+            if error.code in (408, 429) or (500 <= error.code <= 599):
+                raise PayPalAmbiguousResultError(f"PayPal request failed (HTTP {error.code}).") from error
             raise PayPalClientError(f"PayPal request failed (HTTP {error.code}).") from error
         except URLError as error:
             raise PayPalAmbiguousResultError("PayPal request outcome is unknown.") from error
