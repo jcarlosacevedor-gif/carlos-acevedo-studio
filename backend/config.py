@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import os
+from urllib.parse import urlparse
 
 
 class ConfigurationError(ValueError):
@@ -19,6 +20,26 @@ PAYPAL_APPROVAL_HOSTS = {
 
 # Protocol constants used across PayPal client and order persistence layers
 REQUEST_ID_MAX_LENGTH = 108
+
+
+def _validate_base_url(value: str) -> str:
+    """Validate and normalize a base URL for the public site."""
+    if not value or not isinstance(value, str):
+        raise ConfigurationError("PUBLIC_SITE_BASE_URL must be a non-empty string.")
+    parsed = urlparse(value)
+    if not parsed.scheme or not parsed.netloc:
+        raise ConfigurationError("PUBLIC_SITE_BASE_URL must be a valid absolute URL (e.g., http://localhost:8000).")
+    if parsed.scheme not in ("http", "https"):
+        raise ConfigurationError("PUBLIC_SITE_BASE_URL must use http or https scheme.")
+    result = f"{parsed.scheme}://{parsed.netloc}"
+    if parsed.path:
+        result += parsed.path.rstrip("/")
+    return result
+
+
+def get_public_site_base_url() -> str:
+    """Get the configured public site base URL, validated."""
+    return _validate_base_url(os.environ.get("PUBLIC_SITE_BASE_URL", "http://127.0.0.1:8000"))
 
 
 @dataclass(frozen=True)

@@ -289,3 +289,22 @@ class OrderService:
             "amount": _format_amount_cents(paid_record.amount_cents),
             "currency": paid_record.currency,
         }
+
+    def resolve_paypal_order(self, paypal_order_id: str) -> dict[str, str]:
+        """Resolve a PayPal order ID to its local order ID via server-side lookup.
+
+        This is a pure correlation operation: it looks up the local order by its
+        PayPal order ID without modifying state, calling PayPal, or exposing
+        any internal details. The paypal_order_id token from the browser is NOT
+        trusted; it is merely used as a lookup key.
+
+        Returns a sanitized result with only: local_order_id.
+        Never exposes brief, amount, currency, request IDs, or secrets.
+        """
+        try:
+            record = self._store.get_by_paypal_order_id(paypal_order_id)
+        except OrderStoreError as error:
+            raise OrderServiceError("Order lookup failed.", 500) from error
+        if record is None:
+            raise OrderServiceError("Order not found.", 404)
+        return {"local_order_id": record.local_order_id}

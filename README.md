@@ -28,6 +28,8 @@ python -m pip install -r requirements.txt
 
 Copia `.env.example` a `.env` cuando llegue la integración de PayPal. `.env` no debe incluirse en Git y ningún secreto debe llegar al frontend.
 
+La variable `PUBLIC_SITE_BASE_URL` configura la URL base del sitio público (e.g., `http://127.0.0.1:8000`). Se usa para construir las URLs de retorno de PayPal (`return_url` y `cancel_url`).
+
 Para ejecutar el servidor local Flask (que también puede servir los archivos estáticos existentes), usa:
 
 ```bash
@@ -51,3 +53,7 @@ python -m backend.paypal_sandbox_smoke capture <ORDER_ID> --solo guitar-solo
 `auth` confirma OAuth sin mostrar el access token. `create --solo` acepta únicamente configuraciones de solo cerradas; `pricing.py` determina el importe y el operador nunca introduce precio. Abre la URL de aprobación con un comprador Personal Sandbox, aprueba la misma orden y conserva su Order ID. Usa la misma opción `--solo` al capturar; el runner solo muestra `PAYMENT CONFIRMED` cuando los estados, importe y moneda esperados coinciden. El runner se niega a ejecutarse con `PAYPAL_ENVIRONMENT=live`.
 
 El backend usa SQLite durable para persistencia de órdenes Custom Song; su archivo de desarrollo vive fuera de Git bajo `instance/`. Los endpoints Flask para Create y Capture ya están implementados y son pruebas automatizadas. El smoke runner Sandbox sigue siendo una herramienta separada para pruebas manuales.
+
+El endpoint `GET /api/paypal/orders/resolve?token=<paypal_order_id>` permite correlacionar un PayPal Order ID con el `local_order_id` local. Este endpoint solo realiza lookup en SQLite y no modifica estados ni consulta PayPal. **El token recibido del navegador NO es autoridad**: se valida sintácticamente, debe existir como `paypal_order_id` persistido en SQLite, y solo sirve para correlación. La verificación definitiva de pago ocurre durante Capture. La correlación server-side permite al frontend obtener el identificador local necesario para llamar al endpoint Capture.
+
+El frontend todavía no está conectado al backend en esta iteración. La integración de return/cancel pages se realizará en una iteración posterior.

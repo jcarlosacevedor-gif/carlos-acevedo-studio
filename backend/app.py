@@ -6,11 +6,11 @@ import re
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import BadRequest, HTTPException
 
-from .config import ConfigurationError, PayPalConfig
+from .config import ConfigurationError, PayPalConfig, get_public_site_base_url
 from .pricing import PricingError, calculate_custom_song_price
 from .order_store import OrderStore
 from .order_service import OrderService, OrderServiceError
-from .paypal_client import PayPalClient
+from .paypal_client import PayPalClient, PayPalClientError, validate_order_id
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +64,10 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
             return order_service
         path = Path(database_path or PROJECT_ROOT / "instance" / "orders.sqlite3")
         path.parent.mkdir(parents=True, exist_ok=True)
-        return OrderService(OrderStore(path), paypal_client or _DeferredPayPalClient(), "https://example.com/paypal/return", "https://example.com/paypal/cancel")
+        base_url = get_public_site_base_url()
+        return_url = f"{base_url}/paypal/return"
+        cancel_url = f"{base_url}/paypal/cancel"
+        return OrderService(OrderStore(path), paypal_client or _DeferredPayPalClient(), return_url, cancel_url)
 
     @app.errorhandler(APIError)
     def handle_api_error(error: APIError):
@@ -79,6 +82,22 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
     @app.get("/")
     def home_page():
         return send_from_directory(PROJECT_ROOT, "index.html")
+
+    @app.get("/api/paypal/orders/resolve")
+    def resolve_paypal_order():
+        token = request.args.get("token")
+        if not token:
+            raise APIError("Token parameter is required.", 400)
+        try:
+            validate_order_id(token)
+        except (ValueError, PayPalClientError):
+            raise APIError("Invalid token format.", 400)
+        service = service_for_request()
+        try:
+            result = service.resolve_paypal_order(token)
+        except OrderServiceError as error:
+            raise APIError(str(error), error.status_code) from error
+        return jsonify(result), 200
 
     @app.post("/api/paypal/orders")
     def create_order_placeholder():

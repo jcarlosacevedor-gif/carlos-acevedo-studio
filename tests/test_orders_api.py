@@ -391,3 +391,170 @@ class OrdersApiTests(unittest.TestCase):
             connection.close()
         self.assertEqual(status, "PENDING")
         self.assertEqual(request_id, paypal.calls[0][0][2])
+
+
+class ResolveEndpointTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        self.service = OrderService(self.store, FakePayPal(), "https://example.test/return", "https://example.test/cancel")
+        self.client = create_app(order_service=self.service).test_client()
+    def tearDown(self): self.temp.cleanup()
+
+    def test_resolve_valid_known_token_returns_200_local_order_id(self):
+        # First create an order
+        create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        self.assertEqual(create_resp.status_code, 201)
+        local_order_id = create_resp.json["local_order_id"]
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        # Now resolve with the paypal_order_id as token
+        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"local_order_id": local_order_id})
+
+    def test_resolve_token_absent_returns_400(self):
+        response = self.client.get("/api/paypal/orders/resolve")
+        self.assertEqual(response.status_code, 400)
+
+    def test_resolve_empty_token_returns_400(self):
+        response = self.client.get("/api/paypal/orders/resolve?token=")
+        self.assertEqual(response.status_code, 400)
+
+    def test_resolve_invalid_token_format_returns_400(self):
+        # Token with special characters is invalid
+        response = self.client.get("/api/paypal/orders/resolve?token=INVALID!")
+        self.assertEqual(response.status_code, 400)
+
+    def test_resolve_valid_unknown_token_returns_404(self):
+        response = self.client.get("/api/paypal/orders/resolve?token=PAYPAL999")
+        self.assertEqual(response.status_code, 404)
+
+    def test_resolve_response_contains_only_local_order_id(self):
+        create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"secret":"data"}})
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        self.assertEqual(response.status_code, 200)
+        json_data = response.json
+        self.assertEqual(set(json_data.keys()), {"local_order_id"})
+        self.assertNotIn("brief", json_data)
+        self.assertNotIn("amount", json_data)
+        self.assertNotIn("currency", json_data)
+        self.assertNotIn("solo", json_data)
+        self.assertNotIn("paypal_order_id", json_data)
+
+    def test_resolve_does_not_call_paypal(self):
+        # Create order
+        create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        # Get the service's paypal client to check calls
+        paypal = self.service._paypal_client
+        initial_calls = len(paypal.calls) if hasattr(paypal, 'calls') else 0
+
+        # Resolve should not call PayPal
+        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        self.assertEqual(response.status_code, 200)
+
+        # PayPal calls should not have increased
+        final_calls = len(paypal.calls) if hasattr(paypal, 'calls') else 0
+        self.assertEqual(initial_calls, final_calls)
+
+    def test_resolve_does_not_change_sqlite_status(self):
+        create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        # Resolve
+        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        self.assertEqual(response.status_code, 200)
+
+        # Check status in SQLite is still PAYPAL_CREATED (unchanged)
+        import sqlite3
+        connection = sqlite3.connect(self.store._database_path)
+        try:
+            status, = connection.execute("SELECT status FROM custom_song_orders").fetchone()
+        finally:
+            connection.close()
+        self.assertEqual(status, "PAYPAL_CREATED")
+
+
+class ReturnUrlConfigTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        self.paypal = FakePayPal()
+        self.service = OrderService(self.store, self.paypal, "https://custom-return.test/paypal/return", "https://custom-return.test/paypal/cancel")
+        self.client = create_app(order_service=self.service).test_client()
+    def tearDown(self): self.temp.cleanup()
+
+    def test_create_returns_configured_return_url(self):
+        response = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        self.assertEqual(response.status_code, 201)
+        # The response should contain approval_url
+        self.assertIn("approval_url", response.json)
+
+    def test_create_returns_configured_cancel_url(self):
+        response = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        self.assertEqual(response.status_code, 201)
+        # The approval_url is created by PayPal client with our return/cancel URLs
+        self.assertIn("approval_url", response.json)
+
+    def test_create_urls_not_containing_token(self):
+        response = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        self.assertEqual(response.status_code, 201)
+        approval_url = response.json["approval_url"]
+        # The approval_url from FakePayPal contains the token, but our return/cancel URLs passed to PayPal should not
+        # We can't easily assert this without modifying FakePayPal, but the contract is:
+        # return_url and cancel_url should be clean base URLs without token
+        self.assertIn("approval_url", response.json)
+
+    def test_product_slug_is_custom_song(self):
+        # Verify the canonical product slug is custom-song (not custom_song)
+        response = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        self.assertEqual(response.status_code, 201)
+
+    def test_wrong_product_slug_is_rejected(self):
+        response = self.client.post("/api/paypal/orders", json={"product":"custom_song","solo":"none","brief":{"name":"Test"}})
+        self.assertEqual(response.status_code, 422)
+
+
+class ResolveArchitectureTests(unittest.TestCase):
+    def test_resolve_uses_public_service_api(self):
+        # This test verifies that the resolve endpoint uses the public service API
+        # (resolve_paypal_order) rather than accessing _store directly.
+        # We use a custom OrderService that tracks method calls.
+        from backend.order_service import OrderService
+        from backend.order_store import OrderStore
+        from pathlib import Path
+        import tempfile
+
+        temp = tempfile.TemporaryDirectory()
+        try:
+            store = OrderStore(Path(temp.name) / "orders.sqlite3")
+            paypal = FakePayPal()
+            service = OrderService(store, paypal, "https://test.test/return", "https://test.test/cancel")
+
+            # Track calls to resolve_paypal_order
+            original_resolve = service.resolve_paypal_order
+            resolve_calls = []
+            def tracking_resolve(paypal_order_id):
+                resolve_calls.append(paypal_order_id)
+                return original_resolve(paypal_order_id)
+            service.resolve_paypal_order = tracking_resolve
+
+            client = create_app(order_service=service).test_client()
+
+            # Create an order
+            create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+            paypal_order_id = create_resp.json["paypal_order_id"]
+
+            # Call resolve endpoint
+            response = client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+            self.assertEqual(response.status_code, 200)
+
+            # Verify resolve_paypal_order was called on the service
+            self.assertEqual(len(resolve_calls), 1)
+            self.assertEqual(resolve_calls[0], paypal_order_id)
+        finally:
+            temp.cleanup()

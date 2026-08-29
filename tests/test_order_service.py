@@ -644,3 +644,87 @@ class OrderServiceCaptureTests(unittest.TestCase):
         # Verify local status remains PAYPAL_CREATED
         reloaded = self.store.get_by_local_order_id(record.local_order_id)
         self.assertEqual(reloaded.status, "PAYPAL_CREATED")
+
+
+class ResolvePayPalOrderTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.database_path = Path(self.temporary_directory.name) / "orders.sqlite3"
+        self.store = OrderStore(self.database_path)
+        self.paypal_client = MagicMock()
+        self.service = OrderService(
+            store=self.store,
+            paypal_client=self.paypal_client,
+            return_url="https://example.com/return",
+            cancel_url="https://example.com/cancel",
+        )
+
+    def tearDown(self):
+        self.temporary_directory.cleanup()
+
+    def test_resolve_known_paypal_order_id_returns_local_order_id(self):
+        record = self.store.create_order_record(
+            product="custom-song",
+            solo="guitar-solo",
+            amount_cents=22400,
+            currency="USD",
+            brief={"name": "Test"},
+            create_request_id="create-1",
+        )
+        attached = self.store.attach_paypal_order(record.local_order_id, "PAYPALORDER123")
+        result = self.service.resolve_paypal_order("PAYPALORDER123")
+        self.assertEqual(result, {"local_order_id": attached.local_order_id})
+
+    def test_resolve_unknown_paypal_order_id_returns_404(self):
+        with self.assertRaises(OrderServiceError) as ctx:
+            self.service.resolve_paypal_order("UNKNOWN_ORDER")
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertIn("not found", str(ctx.exception).lower())
+
+    def test_resolve_does_not_call_paypal(self):
+        record = self.store.create_order_record(
+            product="custom-song",
+            solo="none",
+            amount_cents=19900,
+            currency="USD",
+            brief={"name": "Test"},
+            create_request_id="create-1",
+        )
+        self.store.attach_paypal_order(record.local_order_id, "PAYPALORDER456")
+        self.service.resolve_paypal_order("PAYPALORDER456")
+        self.paypal_client.create_order.assert_not_called()
+        self.paypal_client.show_order.assert_not_called()
+        self.paypal_client.capture_order.assert_not_called()
+
+    def test_resolve_does_not_change_status(self):
+        record = self.store.create_order_record(
+            product="custom-song",
+            solo="none",
+            amount_cents=19900,
+            currency="USD",
+            brief={"name": "Test"},
+            create_request_id="create-1",
+        )
+        self.store.attach_paypal_order(record.local_order_id, "PAYPALORDER789")
+        initial = self.store.get_by_local_order_id(record.local_order_id)
+        self.assertEqual(initial.status, "PAYPAL_CREATED")
+        self.service.resolve_paypal_order("PAYPALORDER789")
+        final = self.store.get_by_local_order_id(record.local_order_id)
+        self.assertEqual(final.status, "PAYPAL_CREATED")
+
+    def test_resolve_returns_only_local_order_id(self):
+        record = self.store.create_order_record(
+            product="custom-song",
+            solo="piano-solo",
+            amount_cents=22400,
+            currency="USD",
+            brief={"secret": "data"},
+            create_request_id="create-1",
+        )
+        attached = self.store.attach_paypal_order(record.local_order_id, "PAYPALORDER999")
+        result = self.service.resolve_paypal_order("PAYPALORDER999")
+        self.assertEqual(set(result.keys()), {"local_order_id"})
+        self.assertNotIn("brief", result)
+        self.assertNotIn("amount", result)
+        self.assertNotIn("currency", result)
+        self.assertNotIn("solo", result)
