@@ -6,18 +6,87 @@
   const es = {
     eyebrow:"MÚSICA EXCLUSIVA",music:"Música",musicDescription:"Música creada con sensibilidad artística, producción refinada y una voz creativa distintiva.",product:"Canción Personalizada",productDescription:"Una canción original escrita y producida especialmente para ti.",humanNote:"Composición humana. Producción humana.",order:"PEDIR CANCIÓN PERSONALIZADA",fullTitle:"Producción Completa de Canción",fullDescription:"Desde una grabación sencilla hasta una obra plenamente realizada, tu música se desarrolla con sensibilidad artística y producción refinada.",step:"Paso",of:"de",yourSong:"Tu canción",purposeLabel:"¿Para qué es esta canción?",purposeGift:"Regalo personal",purposeWedding:"Boda / aniversario",purposeFilm:"Proyecto audiovisual, sonoro o multimedia",purposeEvent:"Evento",purposeOnline:"Contenido en línea",purposeBusiness:"Proyecto pequeño / negocio",other:"Otro",purposeOther:"Indica para qué es",subject:"¿De quién o de qué trata la canción?",story:"Cuéntame la historia detrás de tu canción",songLanguage:"Idioma de la canción",english:"Inglés",spanish:"Español",languageOther:"Indica el idioma",genre:"Género o estilo preferido",genrePrompt:"Selecciona un género o estilo",softRock:"Rock ligero",ballad:"Balada",acoustic:"Acústico",indie:"Indie / Alternativo",latin:"Latino",cinematic:"Cinemático",genreOther:"Indica el género o estilo",mood:"¿Qué emoción debe transmitir?",romantic:"Romántica",joyful:"Alegre",emotional:"Emotiva",nostalgic:"Nostálgica",hopeful:"Esperanzadora",dramatic:"Dramática",energetic:"Enérgica",moodOther:"Describe la emoción",references:"Referencias musicales",optional:"Opcional",referencesHelp:"Las referencias solo comunican dirección y estilo. Tu canción será una composición original.",lyricsDirection:"Letra y dirección creativa",lyricsStatus:"¿Ya tienes la letra?",lyricsNone:"No — escríbela para mí",lyricsIdeas:"Tengo ideas o frases",lyricsComplete:"Sí — tengo la letra completa",lyricsDetails:"Letra, frases, nombres o detalles que quieras incluir",lyricsPermission:"Confirmo que poseo o tengo permiso para usar la letra que proporcioné.",avoid:"¿Hay algo que deba evitar?",freedom:"¿Cuánta libertad creativa te gustaría que tuviera?",freedomLead:"Toma el liderazgo creativo",freedomBalanced:"Un punto intermedio",freedomClose:"Sigue mi brief de cerca",sound:"Sonido",instruments:"Elige la instrumentación principal",drums:"Batería",bass:"Bajo",piano:"Piano",guitar:"Guitarra",youDecide:"Tú decides — confío en tu criterio creativo",vocal:"Elige la voz",vocalCarlos:"Carlos Acevedo — incluido",vocalAi:"Voz de IA con licencia comercial — incluida",aiNote:"Solo la interpretación vocal puede ser generada por inteligencia artificial. La letra, composición, arreglo y producción son realizados por Carlos Acevedo.",reviewOptions:"Revisión y opciones",compositionReview:"Etapa 1 — Revisión de composición",compositionText:"Aprueba la melodía, letra, armonía y estructura antes de que comience la producción completa.",productionReview:"Etapa 2 — Revisión de producción",productionText:"Revisa la producción terminada y solicita ajustes finales menores.",reviewsNote:"La mayoría de los proyectos se completan en estas dos etapas. Hay revisiones adicionales disponibles si las necesitas.",turnaround:"Tiempo estimado: hasta 7 días",turnaroundText:"La producción comienza después del pago y de recibir un brief creativo completo. El tiempo final puede variar si hay comentarios o revisiones pendientes.",solo:"Solo instrumental opcional",soloNone:"Ninguno — $0",soloGuitar:"Solo de guitarra — +$25",soloPiano:"Solo de piano — +$25",additional:"¿Hay algo más que deba saber?",reviewSong:"Revisa tu Canción Personalizada",total:"Total",contentAck:"Confirmo que mi solicitud no promueve odio, discriminación, acoso, ataques dirigidos ni violencia contra personas o grupos.",contentHelp:"No se aceptan solicitudes destinadas al racismo, odio étnico o religioso, discriminación, clasismo, ataques dirigidos, acoso, humillación, amenazas o incitación a la violencia.",revisionAck:"Entiendo que Canción Personalizada incluye una Revisión de composición y una Revisión de producción. Las revisiones adicionales pueden requerir un cargo extra.",licenseAck:"Entiendo que Canción Personalizada se entrega con una licencia de uso comercial y que Carlos Acevedo conserva la autoría de la composición original.",back:"Atrás",continue:"Continuar",successTitle:"El brief de tu Canción Personalizada se validó correctamente.",successText:"La integración de pago se añadirá en la siguiente iteración.",backMusic:"Volver a Música",reviewComplete:"Finalizar revisión",close:"Cerrar el formulario de Canción Personalizada",
     errorPurpose:"Elige para qué es la canción.",errorPurposeOther:"Indica para qué es la canción.",errorSubject:"Indica de quién o de qué trata la canción.",errorStory:"Cuéntanos la historia detrás de tu canción.",errorLanguage:"Elige el idioma de la canción.",errorLanguageOther:"Indica el idioma de la canción.",errorGenre:"Elige un género o estilo.",errorGenreOther:"Indica el género o estilo.",errorMood:"Elige al menos una emoción para la canción.",errorMoodOther:"Describe la emoción que marcaste como Otro.",errorLyrics:"Elige el estado de la letra.",errorPermission:"Confirma que tienes permiso para usar la letra completa.",errorFreedom:"Elige el nivel de libertad creativa.",errorInstrument:"Elige al menos una opción de instrumentación.",errorVocal:"Elige una opción de voz.",errorAck:"Confirma los tres reconocimientos para completar la revisión.",discard:"¿Cerrar este formulario y descartar el brief de tu Canción Personalizada?",
-    summaryPurpose:"Propósito",summarySubject:"Tema",summaryStory:"Historia",summaryLanguage:"Idioma",summaryGenre:"Género / estilo",summaryMood:"Emoción",summaryLyrics:"Letra",summaryLyricsDetails:"Detalles de letra",summaryAvoid:"Evitar",summaryFreedom:"Libertad creativa",summaryInstruments:"Instrumentación principal",summaryVocal:"Voz",summarySolo:"Solo instrumental",summaryReferences:"Referencias musicales",summaryAdditional:"Notas adicionales"
+    summaryPurpose:"Propósito",summarySubject:"Tema",summaryStory:"Historia",summaryLanguage:"Idioma",summaryGenre:"Género / estilo",summaryMood:"Emoción",summaryLyrics:"Letra",summaryLyricsDetails:"Detalles de letra",summaryAvoid:"Evitar",summaryFreedom:"Libertad creativa",summaryInstruments:"Instrumentación principal",summaryVocal:"Voz",summarySolo:"Solo instrumental",summaryReferences:"Referencias musicales",summaryAdditional:"Notas adicionales",
+    creatingOrder: "Creando tu pedido seguro...",
+    orderCreationFailed: "No pudimos crear tu pedido. Inténtalo de nuevo."
   };
   const translations = { en: {}, es };
   document.querySelectorAll("[data-i18n]").forEach((el) => { translations.en[el.dataset.i18n] ||= el.textContent.trim(); });
-  Object.assign(translations.en,{close:"Close Custom Song form",reviewComplete:"Review Complete",errorPurpose:"Choose what the song is for.",errorPurposeOther:"Tell us what the song is for.",errorSubject:"Tell us who or what the song is about.",errorStory:"Tell us the story behind your song.",errorLanguage:"Choose the song language.",errorLanguageOther:"Specify the song language.",errorGenre:"Choose a genre or style.",errorGenreOther:"Tell me the genre or style.",errorMood:"Choose at least one feeling for the song.",errorMoodOther:"Describe the feeling you selected as Other.",errorLyrics:"Choose your lyrics status.",errorPermission:"Confirm that you own or have permission to use the complete lyrics.",errorFreedom:"Choose your preferred level of creative freedom.",errorInstrument:"Choose at least one core instrumentation option.",errorVocal:"Choose a vocal option.",errorAck:"Please confirm all three acknowledgements to complete your review.",discard:"Close this form and discard your Custom Song brief?",summaryPurpose:"Purpose",summarySubject:"Subject",summaryStory:"Story",summaryLanguage:"Language",summaryGenre:"Genre / style",summaryMood:"Mood",summaryLyrics:"Lyrics",summaryLyricsDetails:"Lyrics details",summaryAvoid:"Avoid",summaryFreedom:"Creative freedom",summaryInstruments:"Core instrumentation",summaryVocal:"Vocal",summarySolo:"Instrumental solo",summaryReferences:"Musical references",summaryAdditional:"Additional notes"});
+  Object.assign(translations.en,{close:"Close Custom Song form",reviewComplete:"Review Complete",errorPurpose:"Choose what the song is for.",errorPurposeOther:"Tell us what the song is for.",errorSubject:"Tell us who or what the song is about.",errorStory:"Tell us the story behind your song.",errorLanguage:"Choose the song language.",errorLanguageOther:"Specify the song language.",errorGenre:"Choose a genre or style.",errorGenreOther:"Tell me the genre or style.",errorMood:"Choose at least one feeling for the song.",errorMoodOther:"Describe the feeling you selected as Other.",errorLyrics:"Choose your lyrics status.",errorPermission:"Confirm that you own or have permission to use the complete lyrics.",errorFreedom:"Choose your preferred level of creative freedom.",errorInstrument:"Choose at least one core instrumentation option.",errorVocal:"Choose a vocal option.",errorAck:"Please confirm all three acknowledgements to complete your review.",discard:"Close this form and discard your Custom Song brief?",summaryPurpose:"Purpose",summarySubject:"Subject",summaryStory:"Story",summaryLanguage:"Language",summaryGenre:"Genre / style",summaryMood:"Mood",summaryLyrics:"Lyrics",summaryLyricsDetails:"Lyrics details",summaryAvoid:"Avoid",summaryFreedom:"Creative freedom",summaryInstruments:"Core instrumentation",summaryVocal:"Vocal",summarySolo:"Instrumental solo",summaryReferences:"Musical references",summaryAdditional:"Additional notes",
+    creatingOrder: "Creating your secure order...",
+    orderCreationFailed: "We couldn't create your order. Please try again."
+  });
   let language = "en";
   const panel=modal.querySelector(".custom-song-modal-panel"), form=modal.querySelector("form"), success=modal.querySelector("[data-custom-song-success]"), steps=[...modal.querySelectorAll("[data-custom-song-step]")], current=modal.querySelector("[data-current-step]"), progress=modal.querySelector("[data-custom-song-progress-bar]"), back=modal.querySelector("[data-custom-song-back]"), next=modal.querySelector("[data-custom-song-next]"), error=modal.querySelector("[data-custom-song-error]"), summary=modal.querySelector("[data-custom-song-summary]"), soloLine=modal.querySelector("[data-custom-song-solo-line]"), soloPrice=modal.querySelector("[data-custom-song-solo-price]"), total=modal.querySelector("[data-custom-song-total]");
   let step=1, opener=null;
   const t=(key)=>translations[language][key] || translations.en[key] || key;
   const f=(name)=>form.elements.namedItem(name), first=(name)=>form.querySelector(`[name="${name}"]`), checked=(name)=>form.querySelector(`[name="${name}"]:checked`)?.value || "", checks=(name)=>[...form.querySelectorAll(`[name="${name}"]:checked`)].map((x)=>x.value);
   const labelFor=(value, map)=>t(map[value] || value);
-  const maps={purpose:{gift:"purposeGift",wedding:"purposeWedding",film:"purposeFilm",event:"purposeEvent",online:"purposeOnline",business:"purposeBusiness",other:"other"},language:{english:"english",spanish:"spanish",other:"other"},mood:{romantic:"romantic",joyful:"joyful",emotional:"emotional",nostalgic:"nostalgic",hopeful:"hopeful",dramatic:"dramatic",energetic:"energetic",other:"other"},lyricsStatus:{none:"lyricsNone",ideas:"lyricsIdeas",complete:"lyricsComplete"},creativeFreedom:{lead:"freedomLead",balanced:"freedomBalanced",close:"freedomClose"},instrument:{drums:"drums",bass:"bass",piano:"piano",guitar:"guitar","you-decide":"youDecide"},vocal:{carlos:"vocalCarlos",ai:"vocalAi"},solo:{none:"soloNone",guitar:"soloGuitar",piano:"soloPiano"},genre:{pop:"pop",rock:"rock","soft-rock":"softRock",ballad:"ballad",acoustic:"acoustic","indie-alternative":"indie",folk:"folk","rnb-soul":"rnb-soul",jazz:"jazz",blues:"blues",latin:"latin",cinematic:"cinematic",other:"other"}};
+  const maps={purpose:{gift:"purposeGift",wedding:"purposeWedding",film:"purposeFilm",event:"purposeEvent",online:"purposeOnline",business:"purposeBusiness",other:"other"},language:{english:"english",spanish:"spanish",other:"other"},mood:{romantic:"romantic",joyful:"joyful",emotional:"emotional",nostalgic:"nostalgic",hopeful:"hopeful",dramatic:"dramatic",energetic:"energetic",other:"other"},lyricsStatus:{none:"lyricsNone",ideas:"lyricsIdeas",complete:"lyricsComplete"},creativeFreedom:{lead:"freedomLead",balanced:"freedomBalanced",close:"freedomClose"},instrument:{drums:"drums",bass:"bass",piano:"piano",guitar:"guitar","you-decide":"youDecide"},vocal:{carlos:"vocalCarlos",ai:"vocalAi"},solo:{none:"soloNone","guitar-solo":"soloGuitar","piano-solo":"soloPiano"},genre:{pop:"pop",rock:"rock","soft-rock":"softRock",ballad:"ballad",acoustic:"acoustic","indie-alternative":"indie",folk:"folk","rnb-soul":"rnb-soul",jazz:"jazz",blues:"blues",latin:"latin",cinematic:"cinematic",other:"other"}};
+
+  // ============================================================================
+  // BUILD BRIEF: Construct the brief object from form data
+  // ============================================================================
+  function buildBrief() {
+    const result = {
+      purpose: checked("purpose"),
+      subject: f("subject").value.trim(),
+      story: f("story").value.trim(),
+      language: checked("language"),
+      genre: f("genre").value,
+      mood: checks("mood"),
+      lyricsStatus: checked("lyricsStatus"),
+      creativeFreedom: checked("creativeFreedom"),
+      instrument: checks("instrument"),
+      vocal: checked("vocal"),
+      references: f("references").value.trim() || null,
+      avoid: f("avoid").value.trim() || null,
+      additionalNotes: f("additionalNotes").value.trim() || null,
+      contentGuidelines: f("contentGuidelines").checked,
+      revisionAcknowledgement: f("revisionAcknowledgement").checked,
+      licenseAcknowledgement: f("licenseAcknowledgement").checked
+    };
+
+    // Handle "other" text fields - always include as null or trimmed value
+    result.purposeOther = null;
+    result.languageOther = null;
+    result.genreOther = null;
+    result.moodOther = null;
+
+    if (checked("purpose") === "other") {
+      result.purposeOther = f("purposeOther").value.trim();
+    }
+    if (checked("language") === "other") {
+      result.languageOther = f("languageOther").value.trim();
+    }
+    if (f("genre").value === "other") {
+      result.genreOther = f("genreOther").value.trim();
+    }
+    if (checks("mood").includes("other")) {
+      result.moodOther = f("moodOther").value.trim();
+    }
+
+    // Handle optional text fields
+    if (f("lyricsDetails").value.trim()) {
+      result.lyricsDetails = f("lyricsDetails").value.trim();
+    }
+
+    // lyricsPermission: true/false when lyricsStatus === "complete", null otherwise
+    if (checked("lyricsStatus") === "complete") {
+      result.lyricsPermission = f("lyricsPermission").checked;
+    } else {
+      result.lyricsPermission = null;
+    }
+
+    // Normalize: if the "other" field exists in result but is empty string, set to null
+    if (result.purposeOther === "") result.purposeOther = null;
+    if (result.languageOther === "") result.languageOther = null;
+    if (result.genreOther === "") result.genreOther = null;
+    if (result.moodOther === "") result.moodOther = null;
+
+    return result;
+  }
+
   function renderLanguage(){ const genreLabels={en:{pop:"Pop",rock:"Rock","soft-rock":"Soft Rock",ballad:"Ballad",acoustic:"Acoustic","indie-alternative":"Indie / Alternative",folk:"Folk","rnb-soul":"R&B / Soul",jazz:"Jazz",blues:"Blues",latin:"Latin",cinematic:"Cinematic",other:"Other"},es:{pop:"Pop",rock:"Rock","soft-rock":"Rock ligero",ballad:"Balada",acoustic:"Acústico","indie-alternative":"Indie / Alternativo",folk:"Folk","rnb-soul":"R&B / Soul",jazz:"Jazz",blues:"Blues",latin:"Latino",cinematic:"Cinemático",other:"Otro"}}; document.documentElement.lang=language; document.title=`${t("music")} | Carlos Acevedo Studio`; document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n)); form.querySelectorAll("select[name='genre'] option").forEach(option=>{if(option.value) option.textContent=genreLabels[language][option.value];}); document.querySelectorAll("[data-language-switcher]").forEach(box=>{box.replaceChildren(); ["en","es"].forEach(code=>{const b=document.createElement("button");b.type="button";b.textContent=code.toUpperCase();b.className=code===language?"is-active":"";b.setAttribute("aria-pressed",String(code===language));b.setAttribute("aria-label",code==="en"?"English":"Español");b.addEventListener("click",()=>{language=code;renderLanguage();});box.append(b);});}); modal.querySelector("[data-custom-song-close]").setAttribute("aria-label",t("close")); next.textContent=step===5?t("reviewComplete"):t("continue"); if(step===5) renderSummary(); }
   function condition(key,visible){const el=form.querySelector(`[data-condition="${key}"]`);if(el)el.hidden=!visible;}
   function sync(){condition("purpose-other",checked("purpose")==="other");condition("language-other",checked("language")==="other");condition("genre-other",f("genre").value==="other");condition("mood-other",checks("mood").includes("other"));condition("lyrics-details",["ideas","complete"].includes(checked("lyricsStatus")));condition("lyrics-permission",checked("lyricsStatus")==="complete");}
@@ -30,5 +99,92 @@
   function reset(){form.reset();form.hidden=false;success.hidden=true;sync();show(1);}
   function dirty(){return [...form.querySelectorAll("input,textarea,select")].some(i=>i.name!=="solo"&&((i.type==="radio"||i.type==="checkbox")?i.checked:i.value));}
   function close(force=false){if(!force&&success.hidden&&dirty()&&!confirm(t("discard")))return;reset();modal.hidden=true;document.body.classList.remove("custom-song-modal-open");document.querySelectorAll("body>header,body>main").forEach(e=>e.inert=false);opener?.focus();}
-  open.addEventListener("click",()=>{opener=document.activeElement;reset();modal.hidden=false;document.body.classList.add("custom-song-modal-open");document.querySelectorAll("body>header,body>main").forEach(e=>e.inert=true);setTimeout(()=>modal.querySelector("[data-custom-song-close]").focus(),0);});modal.querySelectorAll("[data-custom-song-close]").forEach(b=>b.addEventListener("click",()=>close()));modal.querySelector("[data-custom-song-finish]").addEventListener("click",()=>close(true));back.addEventListener("click",()=>show(step-1));next.addEventListener("click",()=>{if(!validate())return;if(step<5)show(step+1);else{form.hidden=true;success.hidden=false;panel.focus();}});form.addEventListener("submit",e=>e.preventDefault());form.addEventListener("change",e=>{if(e.target.matches("[name='instrument']")){const all=[...form.querySelectorAll("[name='instrument']")];if(e.target.dataset.youDecide&&e.target.checked)all.filter(x=>!x.dataset.youDecide).forEach(x=>x.checked=false);if(!e.target.dataset.youDecide&&e.target.checked)all.filter(x=>x.dataset.youDecide).forEach(x=>x.checked=false);}sync();if(step===5)renderSummary();});form.addEventListener("input",()=>step===5&&renderSummary());document.addEventListener("keydown",e=>{if(modal.hidden)return;if(e.key==="Escape"){e.preventDefault();close();return;}if(e.key==="Tab"){const focus=[...panel.querySelectorAll("button,input,textarea,select,[tabindex]:not([tabindex='-1'])")].filter(x=>!x.closest("[hidden]")&&!x.disabled);if(e.shiftKey&&document.activeElement===focus[0]){e.preventDefault();focus.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===focus.at(-1)){e.preventDefault();focus[0].focus();}}});renderLanguage();
+
+  let isSubmitting = false;
+
+  async function submitOrder() {
+    if (isSubmitting) return;
+
+    if (!validate()) return;
+
+    // Build the brief from form data
+    const brief = buildBrief();
+
+    // Get solo value
+    const soloValue = checked("solo");
+
+    // Disable button and show loading
+    isSubmitting = true;
+    next.disabled = true;
+    next.textContent = t("creatingOrder");
+    error.textContent = "";
+
+    try {
+      const response = await fetch("/api/paypal/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          product: "custom-song",
+          solo: soloValue,
+          brief: brief
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = t("orderCreationFailed");
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // Keep default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+
+      // Validate required response fields
+      if (!data.local_order_id || !data.paypal_order_id ||
+          !data.status || !data.approval_url ||
+          !data.amount || !data.currency) {
+        throw new Error(t("orderCreationFailed"));
+      }
+
+      if (data.status !== "PAYPAL_CREATED") {
+        throw new Error(t("orderCreationFailed"));
+      }
+
+      // Redirect to PayPal approval URL
+      window.location.assign(data.approval_url);
+
+    } catch (err) {
+      error.textContent = err.message;
+      next.disabled = false;
+      next.textContent = step === 5 ? t("reviewComplete") : t("continue");
+      isSubmitting = false;
+    }
+  }
+
+  open.addEventListener("click",()=>{opener=document.activeElement;reset();modal.hidden=false;document.body.classList.add("custom-song-modal-open");document.querySelectorAll("body>header,body>main").forEach(e=>e.inert=true);setTimeout(()=>modal.querySelector("[data-custom-song-close]").focus(),0);});modal.querySelectorAll("[data-custom-song-close]").forEach(b=>b.addEventListener("click",()=>close()));modal.querySelector("[data-custom-song-finish]").addEventListener("click",()=>close(true));back.addEventListener("click",()=>show(step-1));
+
+  // Modified next button handler for step 5
+  next.addEventListener("click", async ()=>{
+    if (!validate()) return;
+    if (step < 5) {
+      show(step + 1);
+      return;
+    }
+    // Step 5: Submit order to backend
+    await submitOrder();
+  });
+
+  form.addEventListener("submit",e=>e.preventDefault());
+  form.addEventListener("change",e=>{if(e.target.matches("[name='instrument']")){const all=[...form.querySelectorAll("[name='instrument']")];if(e.target.dataset.youDecide&&e.target.checked)all.filter(x=>!x.dataset.youDecide).forEach(x=>x.checked=false);if(!e.target.dataset.youDecide&&e.target.checked)all.filter(x=>x.dataset.youDecide).forEach(x=>x.checked=false);}sync();if(step===5)renderSummary();});
+  form.addEventListener("input",()=>step===5&&renderSummary());
+  document.addEventListener("keydown",e=>{if(modal.hidden)return;if(e.key==="Escape"){e.preventDefault();close();return;}if(e.key==="Tab"){const focus=[...panel.querySelectorAll("button,input,textarea,select,[tabindex]:not([tabindex='-1'])")].filter(x=>!x.closest("[hidden]")&&!x.disabled);if(e.shiftKey&&document.activeElement===focus[0]){e.preventDefault();focus.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===focus.at(-1)){e.preventDefault();focus[0].focus();}}});
+  renderLanguage();
 })();
