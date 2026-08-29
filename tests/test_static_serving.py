@@ -25,8 +25,8 @@ class StaticServingTests(unittest.TestCase):
             "/api/paypal/orders",
             json={"product": "custom-song", "solo": "none"},
         )
-        self.assertEqual(response.status_code, 501)
-        self.assertEqual(response.json["status"], "not_configured")
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("error", response.json)
 
     def test_static_serving_cannot_escape_the_public_root(self):
         for path in ("/../README.md", "/%2e%2e/README.md"):

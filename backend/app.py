@@ -8,10 +8,18 @@ from werkzeug.exceptions import BadRequest, HTTPException
 
 from .config import ConfigurationError, PayPalConfig
 from .pricing import PricingError, calculate_custom_song_price
+from .order_store import OrderStore
+from .order_service import OrderService, OrderServiceError
+from .paypal_client import PayPalClient
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ORDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9]{1,36}$")
+
+
+class _DeferredPayPalClient:
+    def create_order(self, *args, **kwargs):
+        return PayPalClient.from_environment().create_order(*args, **kwargs)
 
 
 def _json_object() -> dict[str, object]:
@@ -32,9 +40,16 @@ class APIError(Exception):
         self.status_code = status_code
 
 
-def create_app() -> Flask:
+def create_app(order_service=None, database_path=None, paypal_client=None) -> Flask:
     """Create the local same-origin server without contacting PayPal."""
     app = Flask(__name__, static_folder=str(PROJECT_ROOT), static_url_path="")
+    app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
+    def service_for_request():
+        if order_service is not None:
+            return order_service
+        path = Path(database_path or PROJECT_ROOT / "instance" / "orders.sqlite3")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return OrderService(OrderStore(path), paypal_client or _DeferredPayPalClient(), "https://example.com/paypal/return", "https://example.com/paypal/cancel")
 
     @app.errorhandler(APIError)
     def handle_api_error(error: APIError):
@@ -52,20 +67,10 @@ def create_app() -> Flask:
 
     @app.post("/api/paypal/orders")
     def create_order_placeholder():
-        payload = _json_object()
         try:
-            pricing = calculate_custom_song_price(payload)
-            PayPalConfig.from_environment(require_credentials=False)
-        except PricingError as error:
-            raise APIError(str(error), 422) from error
-        except ConfigurationError as error:
-            raise APIError(str(error), 500) from error
-
-        return jsonify({
-            "status": "not_configured",
-            "message": "PayPal order creation is not connected yet.",
-            "pricing": pricing,
-        }), 501
+            return jsonify(service_for_request().create_order(_json_object())), 201
+        except OrderServiceError as error:
+            raise APIError(str(error), error.status_code) from error
 
     @app.post("/api/paypal/orders/<order_id>/capture")
     def capture_order_placeholder(order_id: str):

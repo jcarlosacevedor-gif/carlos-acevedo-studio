@@ -34,6 +34,10 @@ class PayPalResponseError(PayPalClientError):
     """Raised when PayPal's response is invalid or incomplete."""
 
 
+class PayPalAmbiguousResultError(PayPalClientError):
+    """The request may have reached PayPal; reconcile with the same request ID."""
+
+
 class PayPalClient:
     """Encapsulates OAuth and Orders v2 requests without pricing knowledge."""
 
@@ -67,14 +71,14 @@ class PayPalClient:
         except HTTPError as error:
             raise PayPalClientError(f"PayPal request failed (HTTP {error.code}).") from error
         except URLError as error:
-            raise PayPalClientError("PayPal request could not be completed.") from error
+            raise PayPalAmbiguousResultError("PayPal request outcome is unknown.") from error
 
         try:
             payload = json.loads(raw_body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise PayPalResponseError("PayPal returned an invalid response.") from error
+            raise PayPalAmbiguousResultError("PayPal request outcome is unknown.") from error
         if not isinstance(payload, dict):
-            raise PayPalResponseError("PayPal returned an invalid response.")
+            raise PayPalAmbiguousResultError("PayPal request outcome is unknown.")
         return payload
 
     def _get_access_token(self) -> str:
