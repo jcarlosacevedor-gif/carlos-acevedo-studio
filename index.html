@@ -23,18 +23,31 @@
 
   <main>
     <section class="hero-section">
+      <div class="hero-stars" aria-hidden="true">
+        <span class="hero-star"></span>
+        <span class="hero-star"></span>
+        <span class="hero-star"></span>
+        <span class="hero-star"></span>
+        <span class="hero-star"></span>
+      </div>
       <div class="container hero-grid">
         <div class="hero-copy">
           <p class="hero-eyebrow">ARTISTRY &middot; LEARNING &middot; CREATION</p>
           <h1 class="hero-title">Art, Music &amp; Learning<br>Crafted Just For You</h1>
           <div class="hero-actions">
             <a class="button button-primary" href="booking.html">Book a Lesson</a>
-            <a class="button button-secondary premium-btn" href="premium-services.html">Premium Services</a>
+            <a class="button button-secondary premium-btn" href="elite-timeslot.html">ELITE MONTHLY TIMESLOT</a>
           </div>
         </div>
-        <div class="hero-visual" aria-hidden="true">
+        <div class="hero-visual">
           <div class="hero-logo">
-            <img src="assets/images/Logotipo_Zoom.png" alt="Logo" id="mainLogo">
+            <a class="hero-logo-link" href="premium-services.html" aria-label="Explore premium services">
+              <img src="assets/images/Logotipo_Zoom.png" alt="Carlos Acevedo Studio logo" id="mainLogo">
+            </a>
+          </div>
+          <div class="hero-logo-callout">
+            <img class="hero-callout-arrow" src="assets/icons/curved-arrow.png" alt="" aria-hidden="true">
+            <p>Click the logo to explore</p>
           </div>
         </div>
       </div>
@@ -43,12 +56,60 @@
 
   <audio id="doorSound" src="assets/audio/door.mp3"></audio>
   <script>
-    const logo = document.getElementById("mainLogo");
+    const logoLink = document.querySelector(".hero-logo-link");
     const sound = document.getElementById("doorSound");
+    let navigationPending = false;
 
-    logo.addEventListener("click", () => {
-      sound.currentTime = 0;
-      sound.play();
+    logoLink.addEventListener("click", (event) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      event.preventDefault();
+      if (navigationPending) {
+        return;
+      }
+
+      navigationPending = true;
+      const destination = logoLink.href;
+      let hasNavigated = false;
+      let fallbackTimer;
+
+      const navigate = () => {
+        if (!hasNavigated) {
+          hasNavigated = true;
+          window.location.assign(destination);
+        }
+      };
+
+      const scheduleNavigation = (delay) => {
+        window.setTimeout(() => {
+          window.clearTimeout(fallbackTimer);
+          navigate();
+        }, delay);
+      };
+
+      fallbackTimer = window.setTimeout(navigate, 900);
+
+      try {
+        sound.pause();
+        sound.currentTime = 0;
+        const playback = sound.play();
+
+        if (playback && typeof playback.then === "function") {
+          playback
+            .then(() => scheduleNavigation(650))
+            .catch(() => {
+              window.clearTimeout(fallbackTimer);
+              navigate();
+            });
+        } else {
+          scheduleNavigation(650);
+        }
+      } catch (error) {
+        window.clearTimeout(fallbackTimer);
+        navigate();
+      }
     });
   </script>
 </body>

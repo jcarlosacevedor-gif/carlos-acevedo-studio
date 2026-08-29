@@ -12,3 +12,7 @@ __pycache__/
 
 # Temp
 temp/
+
+# Local development tooling
+.agent_bridge/
+Session de Codex.txt
