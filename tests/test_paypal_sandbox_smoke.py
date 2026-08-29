@@ -16,14 +16,31 @@ class FakePayPalClient:
         self.config = config
         self.auth_checked = False
         self.create_arguments = None
+        self.create_options = None
+        self.capture_arguments = None
+        self.capture_result = None
 
     def check_authentication(self):
         self.auth_checked = True
         return {"authenticated": True}
 
-    def create_order(self, amount_cents, currency, request_id):
+    def create_order(self, amount_cents, currency, request_id, **kwargs):
         self.create_arguments = (amount_cents, currency, request_id)
-        return {"order_id": "SANDBOXORDER123", "status": "CREATED"}
+        self.create_options = kwargs
+        return {"order_id": "SANDBOXORDER123", "status": "CREATED", "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=SANDBOXORDER123"}
+
+    def capture_order(self, order_id, request_id):
+        self.capture_arguments = (order_id, request_id)
+        if self.capture_result is not None:
+            return self.capture_result
+        return {
+            "order_id": order_id,
+            "order_status": "COMPLETED",
+            "capture_status": "COMPLETED",
+            "capture_id": "CAPTURE123",
+            "amount": "199.00",
+            "currency": "USD",
+        }
 
 
 class PayPalSandboxSmokeTests(unittest.TestCase):
@@ -105,7 +122,72 @@ class PayPalSandboxSmokeTests(unittest.TestCase):
         self.assertEqual(created[0].create_arguments, (19_900, "USD", "12345678-1234-5678-1234-567812345678"))
         self.assertIn("Order ID: SANDBOXORDER123", stdout.getvalue())
         self.assertIn("Amount: $199.00 USD", stdout.getvalue())
+        self.assertIn("Approval URL: https://www.sandbox.paypal.com/checkoutnow?token=SANDBOXORDER123", stdout.getvalue())
         self.assertNotIn(CLIENT_SECRET, stdout.getvalue())
         self.assertNotIn(ACCESS_TOKEN, stdout.getvalue())
         self.assertNotIn("Basic ", stdout.getvalue())
         self.assertNotIn("Bearer ", stdout.getvalue())
+
+    def test_capture_cancelled_or_invalid_never_calls_client(self):
+        created = []
+        stdout, stderr = io.StringIO(), io.StringIO()
+        exit_code = main(
+            ["capture", "SANDBOXORDER123"],
+            environ={"PAYPAL_ENVIRONMENT": "sandbox", "PAYPAL_CLIENT_ID": "test-client-id", "PAYPAL_CLIENT_SECRET": CLIENT_SECRET},
+            input_fn=lambda prompt: "n",
+            client_factory=lambda config: created.append(FakePayPalClient(config)) or created[-1],
+            stdout=stdout,
+            stderr=stderr,
+        )
+        self.assertEqual(exit_code, 0)
+        self.assertIsNone(created[0].capture_arguments)
+        self.assertIn("Capture cancelled.", stdout.getvalue())
+
+        invalid = main(
+            ["capture", "invalid-id!"],
+            environ={"PAYPAL_ENVIRONMENT": "sandbox", "PAYPAL_CLIENT_ID": "test-client-id", "PAYPAL_CLIENT_SECRET": CLIENT_SECRET},
+            client_factory=lambda config: self.fail("Invalid ID must not create a client"),
+            stdout=io.StringIO(),
+            stderr=stderr,
+        )
+        self.assertEqual(invalid, 1)
+
+    def test_capture_confirms_only_completed_base_order(self):
+        created = []
+        order_id = "SANDBOXORDER123"
+        stdout, stderr = io.StringIO(), io.StringIO()
+        request_id = uuid.UUID("12345678-1234-5678-1234-567812345678")
+        exit_code = main(
+            ["capture", order_id],
+            environ={"PAYPAL_ENVIRONMENT": "sandbox", "PAYPAL_CLIENT_ID": "test-client-id", "PAYPAL_CLIENT_SECRET": CLIENT_SECRET},
+            input_fn=lambda prompt: "y",
+            client_factory=lambda config: created.append(FakePayPalClient(config)) or created[-1],
+            request_id_factory=lambda: request_id,
+            stdout=stdout,
+            stderr=stderr,
+        )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(created[0].capture_arguments, (order_id, str(request_id)))
+        self.assertIn("PAYMENT CONFIRMED", stdout.getvalue())
+        self.assertNotIn(CLIENT_SECRET, stdout.getvalue())
+        self.assertNotIn(ACCESS_TOKEN, stdout.getvalue())
+
+    def test_capture_rejects_wrong_status_amount_or_currency(self):
+        for field, value in (("order_status", "CREATED"), ("capture_status", "PENDING"), ("amount", "224.00"), ("currency", "EUR")):
+            with self.subTest(field=field):
+                client = FakePayPalClient(None)
+                client.capture_result = client.capture_order("SANDBOXORDER123", "unused")
+                client.capture_result[field] = value
+                stdout, stderr = io.StringIO(), io.StringIO()
+                exit_code = main(
+                    ["capture", "SANDBOXORDER123"],
+                    environ={"PAYPAL_ENVIRONMENT": "sandbox", "PAYPAL_CLIENT_ID": "test-client-id", "PAYPAL_CLIENT_SECRET": CLIENT_SECRET},
+                    input_fn=lambda prompt: "y",
+                    client_factory=lambda config, client=client: client,
+                    stdout=stdout,
+                    stderr=stderr,
+                )
+                self.assertEqual(exit_code, 1)
+                self.assertNotIn("PAYMENT CONFIRMED", stdout.getvalue())
+                self.assertIn("Payment verification failed", stderr.getvalue())
+                self.assertNotIn(CLIENT_SECRET, stderr.getvalue())

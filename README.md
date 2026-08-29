@@ -43,6 +43,7 @@ Con `PAYPAL_ENVIRONMENT=sandbox`, el runner solicita Client ID y Client Secret s
 ```bash
 python -m backend.paypal_sandbox_smoke auth
 python -m backend.paypal_sandbox_smoke create-199
+python -m backend.paypal_sandbox_smoke capture <ORDER_ID>
 ```
 
-`auth` confirma OAuth sin mostrar el access token. `create-199` crea una orden ficticia Sandbox de $199.00 USD con intent CAPTURE, muestra solamente ID/estado/importe y no la captura. El runner se niega a ejecutarse con `PAYPAL_ENVIRONMENT=live`.
+`auth` confirma OAuth sin mostrar el access token. `create-199` crea una orden ficticia Sandbox de $199.00 USD con intent CAPTURE y muestra ID, estado, importe y URL de aprobación. Abre esa URL con un comprador Personal Sandbox, aprueba la misma orden y conserva su Order ID. Después, `capture <ORDER_ID>` solicita confirmación explícita y solo muestra `PAYMENT CONFIRMED` cuando los estados, importe y moneda esperados coinciden. El runner se niega a ejecutarse con `PAYPAL_ENVIRONMENT=live`.

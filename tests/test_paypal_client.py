@@ -16,6 +16,7 @@ from backend.paypal_client import (
 CLIENT_ID = "test-client-id"
 CLIENT_SECRET = "TEST_SECRET_DO_NOT_USE"
 ACCESS_TOKEN = "TEST_ACCESS_TOKEN_DO_NOT_USE"
+APPROVAL_URL = "https://www.sandbox.paypal.com/checkoutnow?token=ORDER199"
 
 
 class FakeResponse:
@@ -76,11 +77,11 @@ class PayPalClientTests(unittest.TestCase):
     def test_create_order_builds_one_capture_purchase_unit(self):
         with patch(
             "backend.paypal_client.urlopen",
-            side_effect=[self.oauth_response(), FakeResponse({"id": "ORDER199", "status": "CREATED"})],
+            side_effect=[self.oauth_response(), FakeResponse({"id": "ORDER199", "status": "CREATED", "links": [{"rel": "approve", "href": APPROVAL_URL}]})],
         ) as mocked_open:
             result = self.client.create_order(19_900, "USD", "create-199")
 
-        self.assertEqual(result, {"order_id": "ORDER199", "status": "CREATED"})
+        self.assertEqual(result, {"order_id": "ORDER199", "status": "CREATED", "approval_url": APPROVAL_URL})
         request = mocked_open.call_args_list[1].args[0]
         payload = json.loads(request.data.decode("utf-8"))
         self.assertEqual(request.full_url, "https://api-m.sandbox.paypal.com/v2/checkout/orders")
@@ -94,7 +95,7 @@ class PayPalClientTests(unittest.TestCase):
     def test_create_order_formats_22400_cents(self):
         with patch(
             "backend.paypal_client.urlopen",
-            side_effect=[self.oauth_response(), FakeResponse({"id": "ORDER224", "status": "CREATED"})],
+            side_effect=[self.oauth_response(), FakeResponse({"id": "ORDER224", "status": "CREATED", "links": [{"rel": "approve", "href": APPROVAL_URL}]})],
         ) as mocked_open:
             self.client.create_order(22_400, "USD", "create-224")
         payload = json.loads(mocked_open.call_args_list[1].args[0].data.decode("utf-8"))
@@ -109,6 +110,38 @@ class PayPalClientTests(unittest.TestCase):
         with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse({"status": "CREATED"})]):
             with self.assertRaises(PayPalResponseError):
                 self.client.create_order(19_900, "USD", "incomplete-order")
+
+    def test_create_order_uses_only_validated_return_and_cancel_urls(self):
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse({"id": "ORDER199", "status": "CREATED", "links": [{"rel": "approve", "href": APPROVAL_URL}]})]) as mocked_open:
+            self.client.create_order(
+                19_900, "USD", "urls", return_url="https://example.com/return", cancel_url="https://example.com/cancel",
+            )
+        payload = json.loads(mocked_open.call_args_list[1].args[0].data.decode("utf-8"))
+        self.assertEqual(payload["application_context"], {"return_url": "https://example.com/return", "cancel_url": "https://example.com/cancel"})
+
+        for kwargs in (
+            {"return_url": "http://example.com/return", "cancel_url": "https://example.com/cancel"},
+            {"return_url": "https://user:pass@example.com/return", "cancel_url": "https://example.com/cancel"},
+            {"return_url": "https://example.com/return"},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(PayPalClientError):
+                    self.client.create_order(19_900, "USD", "invalid-urls", **kwargs)
+
+    def test_create_order_requires_a_valid_sandbox_approval_url(self):
+        invalid_urls = [
+            None,
+            "http://www.sandbox.paypal.com/checkoutnow?token=ORDER199",
+            "https://sandbox.paypal.com.attacker.example/checkoutnow?token=ORDER199",
+            "https://user:pass@www.sandbox.paypal.com/checkoutnow?token=ORDER199",
+        ]
+        for approval_url in invalid_urls:
+            with self.subTest(approval_url=approval_url):
+                links = [] if approval_url is None else [{"rel": "approve", "href": approval_url}]
+                response = {"id": "ORDER199", "status": "CREATED", "links": links}
+                with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(response)]):
+                    with self.assertRaises(PayPalResponseError):
+                        self.client.create_order(19_900, "USD", "invalid-approval")
 
     def test_capture_order_extracts_only_safe_verification_fields(self):
         capture_response = {

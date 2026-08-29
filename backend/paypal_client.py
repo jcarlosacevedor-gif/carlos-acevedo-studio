@@ -5,7 +5,7 @@ import json
 import re
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 from .config import ConfigurationError, PayPalConfig
@@ -13,6 +13,13 @@ from .config import ConfigurationError, PayPalConfig
 
 REQUEST_ID_MAX_LENGTH = 108
 ORDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9]{1,36}$")
+
+
+def validate_order_id(order_id: str) -> str:
+    """Validate the bounded PayPal order ID used by client and smoke tooling."""
+    if not isinstance(order_id, str) or not ORDER_ID_PATTERN.fullmatch(order_id):
+        raise PayPalClientError("Invalid PayPal order ID.")
+    return order_id
 
 
 class PayPalClientError(RuntimeError):
@@ -51,9 +58,7 @@ class PayPalClient:
 
     @staticmethod
     def _validate_order_id(order_id: str) -> str:
-        if not isinstance(order_id, str) or not ORDER_ID_PATTERN.fullmatch(order_id):
-            raise PayPalClientError("Invalid PayPal order ID.")
-        return order_id
+        return validate_order_id(order_id)
 
     def _request_json(self, request: Request) -> dict[str, Any]:
         try:
@@ -108,11 +113,61 @@ class PayPalClient:
             raise PayPalClientError("Unsupported currency.")
         return currency
 
-    def create_order(self, amount_cents: int, currency: str, request_id: str) -> dict[str, str]:
+    @staticmethod
+    def _validate_checkout_url(url: str, field_name: str) -> str:
+        if not isinstance(url, str):
+            raise PayPalClientError(f"Invalid {field_name}.")
+        try:
+            parsed = urlsplit(url)
+            valid = parsed.scheme == "https" and parsed.hostname and not parsed.username and not parsed.password
+        except ValueError:
+            valid = False
+        if not valid:
+            raise PayPalClientError(f"Invalid {field_name}.")
+        return url
+
+    def _extract_approval_url(self, response: dict[str, Any]) -> str:
+        links = response.get("links")
+        if not isinstance(links, list):
+            raise PayPalResponseError("PayPal returned an incomplete order response.")
+        for link in links:
+            if isinstance(link, dict) and link.get("rel") == "approve":
+                href = link.get("href")
+                if not isinstance(href, str):
+                    break
+                try:
+                    parsed = urlsplit(href)
+                    is_allowed = (
+                        parsed.scheme == "https"
+                        and parsed.hostname in self._config.approval_hosts
+                        and not parsed.username
+                        and not parsed.password
+                    )
+                except ValueError:
+                    is_allowed = False
+                if is_allowed:
+                    return href
+                raise PayPalResponseError("PayPal returned an invalid approval URL.")
+        raise PayPalResponseError("PayPal returned an incomplete order response.")
+
+    def create_order(
+        self,
+        amount_cents: int,
+        currency: str,
+        request_id: str,
+        *,
+        return_url: str | None = None,
+        cancel_url: str | None = None,
+    ) -> dict[str, str]:
         """Create one CAPTURE order from a server-calculated amount."""
         amount_value = self._amount_value(amount_cents)
         currency = self._validate_currency(currency)
         request_id = self._validate_request_id(request_id)
+        if (return_url is None) != (cancel_url is None):
+            raise PayPalClientError("Return and cancel URLs must be provided together.")
+        if return_url is not None:
+            return_url = self._validate_checkout_url(return_url, "return URL")
+            cancel_url = self._validate_checkout_url(cancel_url, "cancel URL")
         access_token = self._get_access_token()
         payload = {
             "intent": "CAPTURE",
@@ -120,6 +175,8 @@ class PayPalClient:
                 "amount": {"currency_code": currency, "value": amount_value},
             }],
         }
+        if return_url is not None:
+            payload["application_context"] = {"return_url": return_url, "cancel_url": cancel_url}
         request = Request(
             f"{self._config.api_base_url}/v2/checkout/orders",
             data=json.dumps(payload).encode("utf-8"),
@@ -136,7 +193,7 @@ class PayPalClient:
         status = response.get("status")
         if not isinstance(order_id, str) or not order_id or not isinstance(status, str) or not status:
             raise PayPalResponseError("PayPal returned an incomplete order response.")
-        return {"order_id": order_id, "status": status}
+        return {"order_id": order_id, "status": status, "approval_url": self._extract_approval_url(response)}
 
     def capture_order(self, order_id: str, request_id: str) -> dict[str, str | None]:
         """Capture a payer-approved order and return only verification fields."""

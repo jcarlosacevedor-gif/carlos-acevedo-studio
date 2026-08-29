@@ -12,6 +12,10 @@ PAYPAL_API_BASE_URLS = {
     "sandbox": "https://api-m.sandbox.paypal.com",
     "live": "https://api-m.paypal.com",
 }
+PAYPAL_APPROVAL_HOSTS = {
+    "sandbox": frozenset({"www.sandbox.paypal.com"}),
+    "live": frozenset({"www.paypal.com"}),
+}
 
 
 @dataclass(frozen=True)
@@ -23,6 +27,10 @@ class PayPalConfig:
     @property
     def api_base_url(self) -> str:
         return PAYPAL_API_BASE_URLS[self.environment]
+
+    @property
+    def approval_hosts(self) -> frozenset[str]:
+        return PAYPAL_APPROVAL_HOSTS[self.environment]
 
     @classmethod
     def from_environment(cls, require_credentials: bool = False) -> "PayPalConfig":
@@ -38,4 +46,3 @@ class PayPalConfig:
         if require_credentials and (not config.client_id or not config.client_secret):
             raise ConfigurationError("PayPal credentials are not configured.")
         return config
-

@@ -8,7 +8,7 @@ import uuid
 from collections.abc import Callable, Mapping
 
 from .config import ConfigurationError, PayPalConfig
-from .paypal_client import PayPalClient, PayPalClientError
+from .paypal_client import PayPalClient, PayPalClientError, validate_order_id
 from .pricing import calculate_custom_song_price
 
 
@@ -44,7 +44,27 @@ def run_create_199(client: PayPalClient, request_id_factory: Callable[[], uuid.U
         amount_cents=pricing["amount_cents"],
         currency=pricing["currency"],
         request_id=str(request_id_factory()),
+        return_url="https://example.com/paypal-sandbox-return",
+        cancel_url="https://example.com/paypal-sandbox-cancel",
     )
+
+
+def run_capture_199(client: PayPalClient, order_id: str, request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4) -> dict[str, str | None]:
+    order_id = validate_order_id(order_id)
+    result = client.capture_order(order_id, str(request_id_factory()))
+    pricing = calculate_custom_song_price({"product": "custom-song", "solo": "none"})
+    expected_amount = f"{pricing['amount_cents'] // 100}.{pricing['amount_cents'] % 100:02d}"
+    checks = {
+        "order ID": result.get("order_id") == order_id,
+        "order status": result.get("order_status") == "COMPLETED",
+        "capture status": result.get("capture_status") == "COMPLETED",
+        "amount": result.get("amount") == expected_amount,
+        "currency": result.get("currency") == pricing["currency"],
+    }
+    failed_check = next((name for name, passed in checks.items() if not passed), None)
+    if failed_check:
+        raise SmokeRunnerError(f"Payment verification failed: {failed_check} did not match.")
+    return result
 
 
 def _format_amount(amount_cents: int, currency: str) -> str:
@@ -63,16 +83,34 @@ def main(
     stderr=None,
 ) -> int:
     parser = argparse.ArgumentParser(description="Manual PayPal Sandbox smoke runner.")
-    parser.add_argument("command", choices=("auth", "create-199"))
+    parser.add_argument("command", choices=("auth", "create-199", "capture"))
+    parser.add_argument("order_id", nargs="?")
     args = parser.parse_args(argv)
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
 
     try:
+        if args.command == "capture":
+            if not args.order_id:
+                raise SmokeRunnerError("An Order ID is required for capture.")
+            validate_order_id(args.order_id)
         client = client_factory(load_sandbox_config(environ, input_fn, secret_fn))
         if args.command == "auth":
             run_authentication(client)
             print("PayPal Sandbox authentication: OK", file=stdout)
+            return 0
+
+        if args.command == "capture":
+            print(f"Order to capture: {args.order_id}", file=stdout)
+            print("This will capture the approved Sandbox order.", file=stdout)
+            if input_fn("Continue? [y/N] ").strip().lower() != "y":
+                print("Capture cancelled.", file=stdout)
+                return 0
+            result = run_capture_199(client, args.order_id, request_id_factory)
+            print("PAYMENT CONFIRMED", file=stdout)
+            print(f"Order ID: {result['order_id']}", file=stdout)
+            print(f"Capture ID: {result['capture_id']}", file=stdout)
+            print(f"Amount: {result['amount']} {result['currency']}", file=stdout)
             return 0
 
         result = run_create_199(client, request_id_factory)
@@ -82,6 +120,7 @@ def main(
         pricing = calculate_custom_song_price({"product": "custom-song", "solo": "none"})
         amount = _format_amount(pricing["amount_cents"], pricing["currency"])
         print(f"Amount: {amount}", file=stdout)
+        print(f"Approval URL: {result['approval_url']}", file=stdout)
         return 0
     except (SmokeRunnerError, ConfigurationError, PayPalClientError) as error:
         print(f"PayPal Sandbox smoke failed: {error}", file=stderr)
