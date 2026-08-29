@@ -15,10 +15,10 @@ import sqlite3
 from typing import Any
 import uuid
 
-from .paypal_client import validate_order_id
+from .paypal_client import REQUEST_ID_MAX_LENGTH, validate_order_id
 
 
-STATUSES = frozenset({"PENDING", "PAYPAL_CREATED", "PAID", "FAILED", "CANCELLED"})
+STATUSES = frozenset({"PENDING", "PAYPAL_CREATED", "CAPTURING", "PAID", "FAILED", "CANCELLED"})
 
 
 class OrderStoreError(ValueError):
@@ -45,8 +45,16 @@ class OrderRecord:
 class OrderStore:
     """SQLite-backed order store using a short-lived connection per operation.
 
-    State transitions are PENDING -> PAYPAL_CREATED -> PAID.  FAILED and
-    CANCELLED are terminal states available for future error handling.
+    State transitions:
+      PENDING -> PAYPAL_CREATED (via attach_paypal_order)
+      PAYPAL_CREATED -> CAPTURING (via begin_capture)
+      CAPTURING -> PAID (via mark_paid)
+      CAPTURING -> PAYPAL_CREATED (via reset_capture_attempt with compare-and-set)
+
+    Terminal states: PAID, FAILED, CANCELLED.
+    FAILED can only be reached from PENDING or PAYPAL_CREATED.
+    CAPTURING -> FAILED is NOT allowed; use reset_capture_attempt for deterministic
+    failures where PayPal did not capture.
     """
 
     def __init__(self, database_path: str | Path):
@@ -87,7 +95,7 @@ class OrderStore:
                     brief_json TEXT NOT NULL,
                     paypal_order_id TEXT UNIQUE,
                     paypal_capture_id TEXT UNIQUE,
-                    status TEXT NOT NULL CHECK (status IN ('PENDING', 'PAYPAL_CREATED', 'PAID', 'FAILED', 'CANCELLED')),
+                    status TEXT NOT NULL CHECK (status IN ('PENDING', 'PAYPAL_CREATED', 'CAPTURING', 'PAID', 'FAILED', 'CANCELLED')),
                     create_request_id TEXT NOT NULL,
                     capture_request_id TEXT
                 )
@@ -234,6 +242,107 @@ class OrderStore:
                         return record
                     raise OrderStoreError("A different capture is already recorded for this order.")
                 if record.status != "PAYPAL_CREATED":
+                    raise OrderStoreError("Local order cannot be marked paid in its current state.")
+                connection.execute(
+                    """
+                    UPDATE custom_song_orders
+                    SET paypal_capture_id = ?, capture_request_id = ?, status = 'PAID', updated_at = ?
+                    WHERE local_order_id = ?
+                    """,
+                    (capture_id, capture_request_id, now, local_order_id),
+                )
+        except sqlite3.IntegrityError as error:
+            raise OrderStoreError("Capture is already attached to another local order.") from error
+        updated = self.get_by_local_order_id(local_order_id)
+        assert updated is not None
+        return updated
+
+    def begin_capture(self, local_order_id: str, capture_request_id: str) -> OrderRecord:
+        """Transition PAYPAL_CREATED -> CAPTURING with idempotent capture request ID."""
+        capture_request_id = self._nonempty_text(capture_request_id, "Capture request ID")
+        if len(capture_request_id) > REQUEST_ID_MAX_LENGTH:
+            raise OrderStoreError("Capture request ID is too long.")
+        now = self._now()
+        try:
+            with self._connection() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute("SELECT * FROM custom_song_orders WHERE local_order_id = ?", (local_order_id,)).fetchone()
+                record = self._record_from_row(row)
+                if record is None:
+                    raise OrderStoreError("Local order was not found.")
+                if record.paypal_order_id is None:
+                    raise OrderStoreError("Local order has no PayPal order attached.")
+                if record.status == "PAYPAL_CREATED":
+                    connection.execute(
+                        "UPDATE custom_song_orders SET status = 'CAPTURING', capture_request_id = ?, updated_at = ? WHERE local_order_id = ?",
+                        (capture_request_id, now, local_order_id),
+                    )
+                elif record.status == "CAPTURING":
+                    if record.capture_request_id == capture_request_id:
+                        return record
+                    raise OrderStoreError("Capture request ID cannot be changed once set.")
+                else:
+                    raise OrderStoreError("Local order cannot begin capture in its current state.")
+        except sqlite3.IntegrityError:
+            raise OrderStoreError("Capture request conflict.")
+        updated = self.get_by_local_order_id(local_order_id)
+        assert updated is not None
+        return updated
+
+    def reset_capture_attempt(self, local_order_id: str, expected_capture_request_id: str) -> OrderRecord:
+        """Reset CAPTURING -> PAYPAL_CREATED only if request ID matches exactly (compare-and-set)."""
+        expected_capture_request_id = self._nonempty_text(expected_capture_request_id, "Expected capture request ID")
+        now = self._now()
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT * FROM custom_song_orders WHERE local_order_id = ?", (local_order_id,)).fetchone()
+            record = self._record_from_row(row)
+            if record is None:
+                raise OrderStoreError("Local order was not found.")
+            if record.status != "CAPTURING":
+                raise OrderStoreError("Local order cannot reset capture attempt in its current state.")
+            if record.capture_request_id != expected_capture_request_id:
+                raise OrderStoreError("Capture request ID does not match.")
+            connection.execute(
+                "UPDATE custom_song_orders SET status = 'PAYPAL_CREATED', capture_request_id = NULL, updated_at = ? WHERE local_order_id = ?",
+                (now, local_order_id),
+            )
+        updated = self.get_by_local_order_id(local_order_id)
+        assert updated is not None
+        return updated
+
+    def mark_paid(
+        self,
+        local_order_id: str,
+        paypal_order_id: str,
+        capture_id: str,
+        amount_cents: int,
+        currency: str,
+        capture_request_id: str,
+    ) -> OrderRecord:
+        paypal_order_id = validate_order_id(paypal_order_id)
+        capture_id = self._nonempty_text(capture_id, "Capture ID")
+        currency = self._nonempty_text(currency, "Currency")
+        capture_request_id = self._nonempty_text(capture_request_id, "Capture request ID")
+        if not isinstance(amount_cents, int) or isinstance(amount_cents, bool) or amount_cents <= 0:
+            raise OrderStoreError("Amount must be a positive integer number of cents.")
+        now = self._now()
+        try:
+            with self._connection() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute("SELECT * FROM custom_song_orders WHERE local_order_id = ?", (local_order_id,)).fetchone()
+                record = self._record_from_row(row)
+                if record is None:
+                    raise OrderStoreError("Local order was not found.")
+                if record.paypal_order_id != paypal_order_id:
+                    raise OrderStoreError("PayPal order does not match the local order.")
+                if record.amount_cents != amount_cents or record.currency != currency:
+                    raise OrderStoreError("Captured payment does not match the stored price.")
+                if record.status == "PAID":
+                    if record.paypal_capture_id == capture_id:
+                        return record
+                    raise OrderStoreError("A different capture is already recorded for this order.")
+                if record.status not in {"PAYPAL_CREATED", "CAPTURING"}:
                     raise OrderStoreError("Local order cannot be marked paid in its current state.")
                 connection.execute(
                     """

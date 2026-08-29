@@ -7,6 +7,7 @@ from urllib.error import HTTPError
 
 from backend.config import PayPalConfig
 from backend.paypal_client import (
+    PayPalAmbiguousResultError,
     PayPalClient,
     PayPalClientError,
     PayPalResponseError,
@@ -180,3 +181,135 @@ class PayPalClientTests(unittest.TestCase):
                 self.client.capture_order("ORDER", "capture")
         self.assertNotIn(CLIENT_SECRET, str(raised.exception))
         self.assertNotIn(ACCESS_TOKEN, str(raised.exception))
+
+    def test_show_order_uses_get_and_bearer(self):
+        order_response = {"id": "ORDER123", "status": "APPROVED", "purchase_units": [{"payments": {}}]}
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]) as mocked_open:
+            result = self.client.show_order("ORDER123")
+        request = mocked_open.call_args_list[1].args[0]
+        self.assertEqual(request.full_url, "https://api-m.sandbox.paypal.com/v2/checkout/orders/ORDER123")
+        self.assertEqual(request.get_method(), "GET")
+        self.assertEqual(request.get_header("Authorization"), f"Bearer {ACCESS_TOKEN}")
+        self.assertEqual(result, {"order_id": "ORDER123", "order_status": "APPROVED"})
+
+    def test_show_order_returns_capture_fields_for_completed_order(self):
+        order_response = {
+            "id": "ORDER456",
+            "status": "COMPLETED",
+            "purchase_units": [{"payments": {"captures": [{
+                "id": "CAPTURE789",
+                "status": "COMPLETED",
+                "amount": {"value": "199.00", "currency_code": "USD"},
+            }]}}],
+        }
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
+            result = self.client.show_order("ORDER456")
+        self.assertEqual(result["order_id"], "ORDER456")
+        self.assertEqual(result["order_status"], "COMPLETED")
+        self.assertEqual(result["capture_id"], "CAPTURE789")
+        self.assertEqual(result["capture_status"], "COMPLETED")
+        self.assertEqual(result["amount"], "199.00")
+        self.assertEqual(result["currency"], "USD")
+
+    def test_show_order_returns_only_order_fields_for_approved_without_capture(self):
+        order_response = {"id": "ORDER789", "status": "APPROVED", "purchase_units": [{"payments": {}}]}
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
+            result = self.client.show_order("ORDER789")
+        self.assertEqual(result, {"order_id": "ORDER789", "order_status": "APPROVED"})
+        self.assertNotIn("capture_id", result)
+        self.assertNotIn("capture_status", result)
+
+    def test_show_order_returns_only_order_fields_for_created_without_capture(self):
+        order_response = {"id": "ORDCREATED", "status": "CREATED", "purchase_units": [{"payments": {"captures": []}}]}
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
+            result = self.client.show_order("ORDCREATED")
+        self.assertEqual(result, {"order_id": "ORDCREATED", "order_status": "CREATED"})
+
+    def test_show_order_rejects_invalid_order_id(self):
+        with self.assertRaises(PayPalClientError):
+            self.client.show_order("invalid-id!")
+        with self.assertRaises(PayPalClientError):
+            self.client.show_order("")
+
+    def test_show_order_rejects_invalid_json_response(self):
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(b"not json")]):
+            with self.assertRaises(PayPalAmbiguousResultError):
+                self.client.show_order("ORDER123")
+
+    def test_show_order_rejects_incomplete_response_missing_purchase_units(self):
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse({"id": "ORDER123", "status": "APPROVED"})]):
+            with self.assertRaises(PayPalResponseError):
+                self.client.show_order("ORDER123")
+
+    def test_show_order_rejects_invalid_capture_structure(self):
+        order_response = {
+            "id": "ORDER123",
+            "status": "COMPLETED",
+            "purchase_units": [{"payments": {"captures": [{"status": 123}]}}],
+        }
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
+            with self.assertRaises(PayPalResponseError):
+                self.client.show_order("ORDER123")
+
+    def test_show_order_rejects_http_error(self):
+        error = HTTPError("https://example.invalid", 404, "Not Found", {}, io.BytesIO(b"{}"))
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), error]):
+            with self.assertRaises(PayPalClientError):
+                self.client.show_order("ORDER123")
+
+    def test_show_order_rejects_ambiguous_network_error(self):
+        from urllib.error import URLError
+        error = URLError("Network error")
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), error]):
+            with self.assertRaises(PayPalAmbiguousResultError):
+                self.client.show_order("ORDER123")
+
+    def test_show_order_does_not_expose_secrets_in_exceptions(self):
+        error = HTTPError("https://example.invalid", 500, "Server Error", {}, io.BytesIO(b'{"error":"bad"}'))
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), error]):
+            with self.assertRaises(PayPalClientError) as raised:
+                self.client.show_order("ORDER123")
+        self.assertNotIn(CLIENT_SECRET, str(raised.exception))
+        self.assertNotIn(ACCESS_TOKEN, str(raised.exception))
+
+    def test_show_order_result_does_not_contain_sensitive_fields(self):
+        order_response = {
+            "id": "ORDER123",
+            "status": "COMPLETED",
+            "payer": {"email": "user@example.com", "name": "Test User"},
+            "payment_source": {"paypal": {}},
+            "links": [{"href": "https://example.com", "rel": "self"}],
+            "purchase_units": [{"payments": {"captures": [{
+                "id": "CAPTURE123",
+                "status": "COMPLETED",
+                "amount": {"value": "199.00", "currency_code": "USD"},
+            }]}}],
+        }
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
+            result = self.client.show_order("ORDER123")
+        self.assertNotIn("payer", result)
+        self.assertNotIn("payment_source", result)
+        self.assertNotIn("links", result)
+        self.assertNotIn("email", str(result))
+        self.assertNotIn("user@example.com", str(result))
+
+    def test_show_order_rejects_mismatched_response_order_id(self):
+        order_response = {
+            "id": "DIFFERENTORDER456",
+            "status": "APPROVED",
+            "purchase_units": [{"payments": {}}],
+        }
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
+            with self.assertRaises(PayPalResponseError) as raised:
+                self.client.show_order("SANDBOXORDER123")
+        self.assertNotIn("DIFFERENTORDER456", str(raised.exception))
+        self.assertNotIn("SANDBOXORDER123", str(raised.exception))
+
+    def test_show_order_rejects_missing_response_order_id(self):
+        order_response = {
+            "status": "APPROVED",
+            "purchase_units": [{"payments": {}}],
+        }
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
+            with self.assertRaises(PayPalResponseError):
+                self.client.show_order("ORDER123")

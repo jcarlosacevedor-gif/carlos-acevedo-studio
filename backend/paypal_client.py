@@ -230,6 +230,36 @@ class PayPalClient:
             "capture_id": capture.get("id"),
         }
 
+    def show_order(self, order_id: str) -> dict[str, str | None]:
+        """Fetch a PayPal order and return only reconciliation-safe fields."""
+        order_id = self._validate_order_id(order_id)
+        access_token = self._get_access_token()
+        request = Request(
+            f"{self._config.api_base_url}/v2/checkout/orders/{order_id}",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+            method="GET",
+        )
+        response = self._request_json(request)
+        response_order_id = response.get("id")
+        if not isinstance(response_order_id, str) or response_order_id != order_id:
+            raise PayPalResponseError("PayPal returned an order ID that does not match the requested one.")
+        result: dict[str, str | None] = {
+            "order_id": order_id,
+            "order_status": response.get("status"),
+        }
+        capture = self._extract_show_capture(response)
+        if capture is not None:
+            result["capture_id"] = capture.get("id")
+            result["capture_status"] = capture.get("status")
+            amount = capture.get("amount")
+            if isinstance(amount, dict):
+                result["amount"] = amount.get("value")
+                result["currency"] = amount.get("currency_code")
+        return result
+
     @staticmethod
     def _extract_capture(response: dict[str, Any]) -> dict[str, Any]:
         try:
@@ -237,6 +267,33 @@ class PayPalClient:
             amount = capture["amount"]
         except (KeyError, IndexError, TypeError) as error:
             raise PayPalResponseError("PayPal returned an incomplete capture response.") from error
+        if (
+            not isinstance(capture.get("status"), str)
+            or not isinstance(amount.get("value"), str)
+            or not isinstance(amount.get("currency_code"), str)
+            or (capture.get("id") is not None and not isinstance(capture.get("id"), str))
+        ):
+            raise PayPalResponseError("PayPal returned an incomplete capture response.")
+        return capture
+
+    @staticmethod
+    def _extract_show_capture(response: dict[str, Any]) -> dict[str, Any] | None:
+        """Extract capture from order response for show_order; return None if no capture."""
+        purchase_units = response.get("purchase_units")
+        if not isinstance(purchase_units, list) or len(purchase_units) == 0:
+            raise PayPalResponseError("PayPal returned an incomplete order response.")
+        payments = purchase_units[0].get("payments")
+        if not isinstance(payments, dict):
+            return None
+        captures = payments.get("captures")
+        if not isinstance(captures, list) or len(captures) == 0:
+            return None
+        capture = captures[0]
+        if not isinstance(capture, dict):
+            raise PayPalResponseError("PayPal returned an incompatible capture structure.")
+        amount = capture.get("amount")
+        if not isinstance(amount, dict):
+            raise PayPalResponseError("PayPal returned an incompatible capture structure.")
         if (
             not isinstance(capture.get("status"), str)
             or not isinstance(amount.get("value"), str)
