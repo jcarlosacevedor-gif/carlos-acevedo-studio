@@ -16,6 +16,12 @@ __pycache__/
 .env.*
 !.env.example
 
+# Local SQLite development data
+instance/
+*.sqlite3
+*.sqlite
+*.db
+
 # Temp
 temp/
 

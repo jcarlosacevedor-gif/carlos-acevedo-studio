@@ -49,3 +49,5 @@ python -m backend.paypal_sandbox_smoke capture <ORDER_ID> --solo guitar-solo
 ```
 
 `auth` confirma OAuth sin mostrar el access token. `create --solo` acepta únicamente configuraciones de solo cerradas; `pricing.py` determina el importe y el operador nunca introduce precio. Abre la URL de aprobación con un comprador Personal Sandbox, aprueba la misma orden y conserva su Order ID. Usa la misma opción `--solo` al capturar; el runner solo muestra `PAYMENT CONFIRMED` cuando los estados, importe y moneda esperados coinciden. El runner se niega a ejecutarse con `PAYPAL_ENVIRONMENT=live`.
+
+El backend ya cuenta con una persistencia SQLite local mínima para futuras órdenes Custom Song; su archivo de desarrollo vive fuera de Git bajo `instance/`. Todavía no está conectada al frontend ni a los endpoints PayPal reales de Flask.
