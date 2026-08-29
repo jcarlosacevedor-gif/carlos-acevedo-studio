@@ -2292,6 +2292,15 @@ a {
   max-width: 640px;
 }
 
+.promolab-hero .music-product-note {
+  margin-top: 12px;
+  color: rgba(102, 252, 241, 0.72);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1.55;
+}
+
 @media (max-width: 900px) {
   .promolab-content {
     margin-left: auto;
@@ -2475,6 +2484,433 @@ a {
   .store-grid {
     grid-template-columns: 1fr;
     max-width: 100%;
+  }
+}
+
+/* Custom Song configurator */
+.custom-song-order-button {
+  margin-top: 20px;
+  padding: 12px 18px;
+  border: 1px solid #66fcf1;
+  border-radius: 4px;
+  background: #66fcf1;
+  color: #061311;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.custom-song-order-button:hover {
+  background: #b4fff9;
+  transform: translateY(-2px);
+}
+
+.custom-song-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.custom-song-cta .custom-song-order-button {
+  margin-top: 0;
+}
+
+.custom-song-card-price {
+  margin: 0;
+  color: rgba(102, 252, 241, 0.8);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.custom-song-modal[hidden] {
+  display: none;
+}
+
+.custom-song-modal {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.custom-song-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(1, 9, 10, 0.88);
+  backdrop-filter: blur(7px);
+}
+
+.custom-song-modal-panel {
+  position: relative;
+  width: min(100%, 960px);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid rgba(102, 252, 241, 0.45);
+  border-radius: 12px;
+  background: #071615;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+body.custom-song-modal-open {
+  overflow: hidden;
+}
+
+.custom-song-close-button {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  right: 16px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(102, 252, 241, 0.35);
+  border-radius: 50%;
+  background: transparent;
+  color: #66fcf1;
+  cursor: pointer;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.custom-song-modal-header {
+  padding: 32px 64px 22px 32px;
+  border-bottom: 1px solid rgba(102, 252, 241, 0.2);
+}
+
+.custom-song-modal-header .hero-eyebrow {
+  margin: 0 0 8px;
+}
+
+.custom-song-modal-header h2 {
+  margin: 0 0 18px;
+  color: #fff;
+  font-size: clamp(1.3rem, 3vw, 2rem);
+}
+
+.custom-song-progress-label {
+  margin-bottom: 7px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.custom-song-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(102, 252, 241, 0.16);
+}
+
+.custom-song-progress span {
+  display: block;
+  width: 20%;
+  height: 100%;
+  background: #66fcf1;
+  transition: width 0.25s ease;
+}
+
+.custom-song-form,
+.custom-song-success {
+  padding: 30px 32px 32px;
+}
+
+.custom-song-step h3,
+.custom-song-success h3 {
+  margin: 0 0 22px;
+  color: #fff;
+  font-size: 1.3rem;
+}
+
+.custom-song-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.custom-song-form fieldset,
+.custom-song-form label {
+  min-width: 0;
+}
+
+.custom-song-form fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.custom-song-form legend,
+.custom-song-form > label,
+.custom-song-form-grid > label {
+  display: block;
+  margin-bottom: 8px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.custom-song-form input[type="text"],
+.custom-song-form select,
+.custom-song-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 12px;
+  border: 1px solid rgba(102, 252, 241, 0.3);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.custom-song-form select {
+  cursor: pointer;
+}
+
+.music-language-row,
+.custom-song-modal-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.music-language-row .hero-eyebrow,
+.custom-song-modal-topline .hero-eyebrow {
+  margin: 0;
+}
+
+.language-switcher {
+  display: inline-flex;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(102, 252, 241, 0.35);
+  border-radius: 999px;
+}
+
+.language-switcher button {
+  min-width: 35px;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.language-switcher button.is-active {
+  background: #66fcf1;
+  color: #061311;
+}
+
+.language-switcher button:focus-visible {
+  position: relative;
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+
+.custom-song-form input::placeholder,
+.custom-song-form textarea::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.custom-song-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 15px;
+}
+
+.custom-song-options label,
+.custom-song-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-size: 0.86rem !important;
+  font-weight: 400 !important;
+}
+
+.custom-song-options input,
+.custom-song-check input {
+  flex: 0 0 auto;
+  margin: 3px 0 0;
+  accent-color: #66fcf1;
+}
+
+.custom-song-wide {
+  grid-column: 1 / -1;
+}
+
+.custom-song-conditional {
+  margin-top: 14px !important;
+}
+
+.custom-song-optional,
+.custom-song-form small,
+.custom-song-acknowledgements small {
+  color: rgba(102, 252, 241, 0.68);
+  font-size: 0.76rem;
+  font-weight: 400;
+}
+
+.custom-song-form small,
+.custom-song-acknowledgements small {
+  display: block;
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+.custom-song-review-stages {
+  margin-bottom: 22px;
+  padding: 17px 18px;
+  border-left: 3px solid #66fcf1;
+  background: rgba(102, 252, 241, 0.06);
+}
+
+.custom-song-review-stages p {
+  margin: 0 0 10px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.custom-song-review-stages p:last-child {
+  margin-bottom: 0;
+}
+
+.custom-song-review-stages strong {
+  display: block;
+  color: #fff;
+}
+
+.custom-song-error {
+  min-height: 1.4em;
+  margin: 22px 0 0;
+  color: #ffaaa4;
+  font-size: 0.88rem;
+}
+
+.custom-song-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.custom-song-summary {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.custom-song-summary div {
+  display: grid;
+  grid-template-columns: minmax(135px, 0.4fr) 1fr;
+  gap: 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(102, 252, 241, 0.14);
+  font-size: 0.88rem;
+}
+
+.custom-song-summary strong {
+  color: #66fcf1;
+}
+
+.custom-song-total {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px 18px;
+  margin-bottom: 24px;
+  padding: 17px;
+  border: 1px solid rgba(102, 252, 241, 0.26);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.custom-song-total strong {
+  color: #66fcf1;
+  text-align: right;
+}
+
+.custom-song-total span:nth-last-of-type(1),
+.custom-song-total strong:last-child {
+  padding-top: 9px;
+  border-top: 1px solid rgba(102, 252, 241, 0.22);
+  color: #fff;
+}
+
+.custom-song-acknowledgements {
+  display: grid;
+  gap: 14px;
+}
+
+.custom-song-success p {
+  margin-bottom: 24px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.custom-song-modal button:focus-visible,
+.custom-song-modal input:focus-visible,
+.custom-song-modal textarea:focus-visible {
+  outline: 3px solid #66fcf1;
+  outline-offset: 3px;
+}
+
+@media (max-width: 650px) {
+  .custom-song-modal {
+    padding: 10px;
+  }
+
+  .custom-song-modal-panel {
+    max-height: calc(100vh - 20px);
+  }
+
+  .custom-song-modal-header,
+  .custom-song-form,
+  .custom-song-success {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .custom-song-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-song-wide {
+    grid-column: auto;
+  }
+
+  .custom-song-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .custom-song-modal-actions .button,
+  .custom-song-success .button {
+    width: 100%;
+  }
+
+  .custom-song-summary div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .music-language-row {
+    align-items: flex-start;
   }
 }
 
