@@ -91,6 +91,11 @@ class PayPalClient:
             raise PayPalResponseError("PayPal returned an incomplete OAuth response.")
         return access_token
 
+    def check_authentication(self) -> dict[str, bool]:
+        """Verify OAuth works without exposing the access token to callers."""
+        self._get_access_token()
+        return {"authenticated": True}
+
     @staticmethod
     def _amount_value(amount_cents: int) -> str:
         if isinstance(amount_cents, bool) or not isinstance(amount_cents, int) or amount_cents <= 0:

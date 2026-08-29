@@ -53,6 +53,12 @@ class PayPalClientTests(unittest.TestCase):
         expected_basic = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
         self.assertEqual(request.get_header("Authorization"), f"Basic {expected_basic}")
 
+    def test_authentication_check_discards_the_access_token(self):
+        with patch("backend.paypal_client.urlopen", return_value=self.oauth_response()):
+            result = self.client.check_authentication()
+        self.assertEqual(result, {"authenticated": True})
+        self.assertNotIn(ACCESS_TOKEN, result.values())
+
     def test_oauth_rejects_missing_token_invalid_json_and_http_error_without_secrets(self):
         scenarios = [
             FakeResponse({}),

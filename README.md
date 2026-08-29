@@ -33,3 +33,16 @@ Para ejecutar el servidor local Flask (que también puede servir los archivos es
 ```bash
 python -m backend.app
 ```
+
+## Smoke tests manuales de PayPal Sandbox
+
+Estas herramientas son exclusivamente de desarrollo para PayPal Sandbox; no son un flujo de producción. Nunca copies credenciales al repositorio ni compartas el Client Secret.
+
+Con `PAYPAL_ENVIRONMENT=sandbox`, el runner solicita Client ID y Client Secret solo si no están disponibles como variables del proceso. El secreto se pide sin eco y no se guarda en archivos.
+
+```bash
+python -m backend.paypal_sandbox_smoke auth
+python -m backend.paypal_sandbox_smoke create-199
+```
+
+`auth` confirma OAuth sin mostrar el access token. `create-199` crea una orden ficticia Sandbox de $199.00 USD con intent CAPTURE, muestra solamente ID/estado/importe y no la captura. El runner se niega a ejecutarse con `PAYPAL_ENVIRONMENT=live`.
