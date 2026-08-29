@@ -9,6 +9,12 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+.venv/
+
+# Local secrets
+.env
+.env.*
+!.env.example
 
 # Temp
 temp/
