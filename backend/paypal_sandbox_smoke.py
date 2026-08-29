@@ -9,7 +9,7 @@ from collections.abc import Callable, Mapping
 
 from .config import ConfigurationError, PayPalConfig
 from .paypal_client import PayPalClient, PayPalClientError, validate_order_id
-from .pricing import calculate_custom_song_price
+from .pricing import PricingError, calculate_custom_song_price
 
 
 class SmokeRunnerError(RuntimeError):
@@ -38,8 +38,15 @@ def run_authentication(client: PayPalClient) -> None:
     client.check_authentication()
 
 
-def run_create_199(client: PayPalClient, request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4) -> dict[str, str]:
-    pricing = calculate_custom_song_price({"product": "custom-song", "solo": "none"})
+SOLO_CHOICES = ("none", "guitar-solo", "piano-solo")
+
+
+def custom_song_pricing(solo: str) -> dict[str, object]:
+    return calculate_custom_song_price({"product": "custom-song", "solo": solo})
+
+
+def run_create(client: PayPalClient, solo: str, request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4) -> dict[str, str]:
+    pricing = custom_song_pricing(solo)
     return client.create_order(
         amount_cents=pricing["amount_cents"],
         currency=pricing["currency"],
@@ -49,10 +56,10 @@ def run_create_199(client: PayPalClient, request_id_factory: Callable[[], uuid.U
     )
 
 
-def run_capture_199(client: PayPalClient, order_id: str, request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4) -> dict[str, str | None]:
+def run_capture(client: PayPalClient, order_id: str, solo: str, request_id_factory: Callable[[], uuid.UUID] = uuid.uuid4) -> dict[str, str | None]:
     order_id = validate_order_id(order_id)
     result = client.capture_order(order_id, str(request_id_factory()))
-    pricing = calculate_custom_song_price({"product": "custom-song", "solo": "none"})
+    pricing = custom_song_pricing(solo)
     expected_amount = f"{pricing['amount_cents'] // 100}.{pricing['amount_cents'] % 100:02d}"
     checks = {
         "order ID": result.get("order_id") == order_id,
@@ -83,16 +90,19 @@ def main(
     stderr=None,
 ) -> int:
     parser = argparse.ArgumentParser(description="Manual PayPal Sandbox smoke runner.")
-    parser.add_argument("command", choices=("auth", "create-199", "capture"))
-    parser.add_argument("order_id", nargs="?")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("auth")
+    create_parser = commands.add_parser("create")
+    create_parser.add_argument("--solo", choices=SOLO_CHOICES, required=True)
+    capture_parser = commands.add_parser("capture")
+    capture_parser.add_argument("order_id")
+    capture_parser.add_argument("--solo", choices=SOLO_CHOICES, required=True)
     args = parser.parse_args(argv)
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
 
     try:
         if args.command == "capture":
-            if not args.order_id:
-                raise SmokeRunnerError("An Order ID is required for capture.")
             validate_order_id(args.order_id)
         client = client_factory(load_sandbox_config(environ, input_fn, secret_fn))
         if args.command == "auth":
@@ -101,28 +111,33 @@ def main(
             return 0
 
         if args.command == "capture":
+            pricing = custom_song_pricing(args.solo)
+            expected_amount = _format_amount(pricing["amount_cents"], pricing["currency"])
             print(f"Order to capture: {args.order_id}", file=stdout)
+            print(f"Expected configuration: {args.solo}", file=stdout)
+            print(f"Expected amount: {expected_amount}", file=stdout)
             print("This will capture the approved Sandbox order.", file=stdout)
             if input_fn("Continue? [y/N] ").strip().lower() != "y":
                 print("Capture cancelled.", file=stdout)
                 return 0
-            result = run_capture_199(client, args.order_id, request_id_factory)
+            result = run_capture(client, args.order_id, args.solo, request_id_factory)
             print("PAYMENT CONFIRMED", file=stdout)
             print(f"Order ID: {result['order_id']}", file=stdout)
             print(f"Capture ID: {result['capture_id']}", file=stdout)
             print(f"Amount: {result['amount']} {result['currency']}", file=stdout)
             return 0
 
-        result = run_create_199(client, request_id_factory)
+        result = run_create(client, args.solo, request_id_factory)
         print("PayPal Sandbox Create Order: OK", file=stdout)
+        print(f"Configuration: {args.solo}", file=stdout)
         print(f"Order ID: {result['order_id']}", file=stdout)
         print(f"Status: {result['status']}", file=stdout)
-        pricing = calculate_custom_song_price({"product": "custom-song", "solo": "none"})
+        pricing = custom_song_pricing(args.solo)
         amount = _format_amount(pricing["amount_cents"], pricing["currency"])
         print(f"Amount: {amount}", file=stdout)
         print(f"Approval URL: {result['approval_url']}", file=stdout)
         return 0
-    except (SmokeRunnerError, ConfigurationError, PayPalClientError) as error:
+    except (SmokeRunnerError, ConfigurationError, PayPalClientError, PricingError) as error:
         print(f"PayPal Sandbox smoke failed: {error}", file=stderr)
         return 1
 
