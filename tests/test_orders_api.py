@@ -9,12 +9,59 @@ from backend.paypal_client import PayPalAmbiguousResultError
 
 
 class FakePayPal:
-    def __init__(self, fail=False): self.fail, self.calls = fail, []
+    def __init__(self, fail=False, approved=True):
+        self.fail = fail
+        self.approved = approved  # if True, show_order returns APPROVED; if False, returns CREATED
+        self.calls = []
+        # Track state and amount per order_id
+        self.order_states = {}
+        self.order_amounts = {}
+
     def create_order(self, amount_cents, currency, request_id, **kwargs):
-        self.calls.append((amount_cents, currency, request_id, kwargs))
-        if self.fail: raise RuntimeError("private brief must not leak")
+        self.calls.append(("create_order", amount_cents, currency, request_id, kwargs))
+        if self.fail:
+            from backend.paypal_client import PayPalClientError
+            raise PayPalClientError("private brief must not leak")
         order_id = f"PAYPALORDER{len(self.calls):03d}"
-        return {"order_id": order_id, "status": "CREATED", "approval_url": f"https://www.sandbox.paypal.com/checkoutnow?token={order_id}"}
+        self.order_states[order_id] = "APPROVED" if self.approved else "CREATED"
+        self.order_amounts[order_id] = amount_cents
+        return {
+            "order_id": order_id,
+            "status": "CREATED",
+            "approval_url": f"https://www.sandbox.paypal.com/checkoutnow?token={order_id}"
+        }
+
+    def show_order(self, order_id):
+        self.calls.append(("show_order", order_id))
+        state = self.order_states.get(order_id, "CREATED")
+        amount_cents = self.order_amounts.get(order_id, 19900)
+        if state == "COMPLETED":
+            return {
+                "order_id": order_id,
+                "order_status": "COMPLETED",
+                "capture_id": f"CAPTURE{order_id[-3:]}",
+                "capture_status": "COMPLETED",
+                "amount": f"{amount_cents // 100}.{amount_cents % 100:02d}",
+                "currency": "USD",
+            }
+        elif state == "APPROVED":
+            return {"order_id": order_id, "order_status": "APPROVED"}
+        else:
+            return {"order_id": order_id, "order_status": "CREATED"}
+
+    def capture_order(self, order_id, request_id):
+        self.calls.append(("capture_order", order_id, request_id))
+        # Mark this order as completed
+        self.order_states[order_id] = "COMPLETED"
+        amount_cents = self.order_amounts.get(order_id, 19900)
+        return {
+            "order_id": order_id,
+            "order_status": "COMPLETED",
+            "capture_id": f"CAPTURE{order_id[-3:]}",
+            "capture_status": "COMPLETED",
+            "amount": f"{amount_cents // 100}.{amount_cents % 100:02d}",
+            "currency": "USD",
+        }
 
 
 class AmbiguousPayPal:
@@ -22,6 +69,28 @@ class AmbiguousPayPal:
     def create_order(self, *args, **kwargs):
         self.calls.append((args, kwargs))
         raise PayPalAmbiguousResultError("unknown")
+    def show_order(self, order_id):
+        self.calls.append(("show_order", order_id))
+        raise PayPalAmbiguousResultError("unknown")
+    def capture_order(self, order_id, request_id):
+        self.calls.append(("capture_order", order_id, request_id))
+        raise PayPalAmbiguousResultError("unknown")
+
+
+class FailingPayPal:
+    def __init__(self): self.calls = []
+    def create_order(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+        from backend.paypal_client import PayPalClientError
+        raise PayPalClientError("Create failed")
+    def show_order(self, order_id):
+        self.calls.append(("show_order", order_id))
+        from backend.paypal_client import PayPalClientError
+        raise PayPalClientError("Show failed")
+    def capture_order(self, order_id, request_id):
+        self.calls.append(("capture_order", order_id, request_id))
+        from backend.paypal_client import PayPalClientError
+        raise PayPalClientError("Capture failed")
 
 
 class OrdersApiTests(unittest.TestCase):
@@ -44,14 +113,267 @@ class OrdersApiTests(unittest.TestCase):
         for payload in ({"product":"custom-song","solo":"none"}, {"product":"custom-song","solo":"none","brief":[]}, {"product":"custom-song","solo":"none","brief":{},"amount":1}):
             self.assertEqual(self.client.post("/api/paypal/orders", json=payload).status_code, 422)
         self.assertEqual(self.client.post("/api/paypal/orders", data="{", content_type="application/json").status_code, 400)
-    def test_capture_is_still_placeholder(self):
-        self.assertEqual(self.client.post("/api/paypal/orders/ORDER123/capture").status_code, 501)
+
+    # --- CAPTURE ENDPOINT TESTS ---
+
+    def test_capture_success_199_returns_paid(self):
+        # Create and capture with the same service
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # First create an order with solo="none" (199.00)
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        self.assertEqual(create_resp.status_code, 201)
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Now capture it - show_order returns APPROVED, capture_order returns COMPLETED
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["status"], "PAID")
+        self.assertEqual(response.json["amount"], "199.00")
+        self.assertEqual(response.json["currency"], "USD")
+
+    def test_capture_success_224_returns_paid(self):
+        # Create and capture with the same service for 224 (piano-solo)
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Create an order with piano-solo (224)
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"piano-solo","brief":{"name":"Test"}})
+        self.assertEqual(create_resp.status_code, 201)
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Now capture it
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["status"], "PAID")
+        self.assertEqual(response.json["amount"], "224.00")
+        self.assertEqual(response.json["currency"], "USD")
+
+    def test_capture_already_paid_returns_200(self):
+        # Create and capture with the same service
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Create and capture
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        self.assertEqual(create_resp.status_code, 201)
+        local_order_id = create_resp.json["local_order_id"]
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        # First capture
+        response1 = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response1.status_code, 200)
+        self.assertEqual(response1.json["status"], "PAID")
+
+        # Second capture (already paid)
+        response2 = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response2.status_code, 200)
+        self.assertEqual(response2.json["status"], "PAID")
+        # Verify paypal.capture_order was NOT called again
+        capture_calls = [c for c in paypal.calls if c[0] == "capture_order"]
+        self.assertEqual(len(capture_calls), 1)
+
+    def test_capture_not_found_returns_404(self):
+        response = self.client.post("/api/paypal/orders/00000000-0000-0000-0000-000000000000/capture")
+        self.assertEqual(response.status_code, 404)
+
+    def test_capture_not_approved_returns_409(self):
+        # Create order with a service that will show CREATED (not approved)
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=False)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Create order (PAYPAL_CREATED)
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Capture will fail because show_order returns CREATED (not approved)
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 409)
+
+    def test_capture_invalid_state_returns_409(self):
+        # To test FAILED state, we need to fail create_order which marks it as FAILED
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(fail=True)  # This will fail create_order, marking it as FAILED
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Create order will fail with 502, and the order record will be marked as FAILED
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        self.assertEqual(create_resp.status_code, 502)
+
+        # Get the local_order_id from the database
+        import sqlite3
+        connection = sqlite3.connect(store._database_path)
+        try:
+            local_order_id, = connection.execute("SELECT local_order_id FROM custom_song_orders").fetchone()
+        finally:
+            connection.close()
+
+        # Try to capture FAILED order - should return 409
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 409)
+
+    def test_capture_reconciliation_completed_no_second_capture(self):
+        # Use a service that will show COMPLETED on show_order for CAPTURING state
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Create order
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"name":"Test"}})
+        local_order_id = create_resp.json["local_order_id"]
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        # Now manually set the order to CAPTURING state and mark the order as COMPLETED in paypal
+        import uuid
+        capture_request_id = str(uuid.uuid4())
+        # Use the store's connection to ensure it's properly committed
+        with store._connection() as connection:
+            connection.execute(
+                "UPDATE custom_song_orders SET status = 'CAPTURING', capture_request_id = ? WHERE local_order_id = ?",
+                (capture_request_id, local_order_id)
+            )
+
+        # Mark this order as completed in the paypal state
+        paypal.order_states[paypal_order_id] = "COMPLETED"
+
+        # Reset the paypal calls to only track calls from capture
+        paypal.calls = []
+
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["status"], "PAID")
+
+        # Verify capture_order was NOT called (reconciliation via show_order)
+        capture_calls = [c for c in paypal.calls if c[0] == "capture_order"]
+        self.assertEqual(len(capture_calls), 0)
+        show_calls = [c for c in paypal.calls if c[0] == "show_order"]
+        self.assertGreater(len(show_calls), 0)
+
+    def test_capture_deterministic_failure_returns_502(self):
+        # Create order with self.client (uses working FakePayPal from setUp)
+        create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        self.assertEqual(create_resp.status_code, 201)
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Create a new service with FailingPayPal for capture (same database)
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FailingPayPal()
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Capture will fail with 502 (deterministic PayPal failure)
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 502)
+
+    def test_capture_ambiguous_result_returns_503(self):
+        # Create order with self.client (uses working FakePayPal from setUp)
+        create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        self.assertEqual(create_resp.status_code, 201)
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Use AmbiguousPayPal for capture (same database)
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = AmbiguousPayPal()
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Capture will fail with 503 (ambiguous PayPal result)
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 503)
+
+    def test_capture_rejects_any_body_data(self):
+        create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Capture rejects any non-empty JSON object (including forbidden fields)
+        for field in ["amount", "paypal_order_id", "capture_id", "status", "note", "foo"]:
+            with self.subTest(field=field):
+                response = self.client.post(f"/api/paypal/orders/{local_order_id}/capture", json={field: "test"})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("does not accept request body data", response.json["error"])
+
+    def test_capture_empty_body_allowed(self):
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Empty body should work
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 200)
+
+    def test_capture_empty_json_object_allowed(self):
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Empty JSON object {} should work
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture", json={})
+        self.assertEqual(response.status_code, 200)
+
+    def test_capture_rejects_non_object_json(self):
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Test"}})
+        local_order_id = create_resp.json["local_order_id"]
+
+        # Array should be rejected
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture", json=[])
+        self.assertEqual(response.status_code, 400)
+
+        # String should be rejected
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture", json="test")
+        self.assertEqual(response.status_code, 400)
+
+    def test_capture_invalid_local_order_id_returns_400(self):
+        response = self.client.post("/api/paypal/orders/invalid-uuid/capture")
+        self.assertEqual(response.status_code, 400)
+
+    def test_capture_privacy_no_secrets_in_response(self):
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPal(approved=True)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        create_resp = client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"name":"Secret"}})
+        local_order_id = create_resp.json["local_order_id"]
+
+        response = client.post(f"/api/paypal/orders/{local_order_id}/capture")
+        self.assertEqual(response.status_code, 200)
+        json_data = response.json
+        self.assertNotIn("brief", json_data)
+        self.assertNotIn("create_request_id", json_data)
+        self.assertNotIn("capture_request_id", json_data)
+        keys = set(json_data.keys())
+        expected = {"local_order_id", "paypal_order_id", "capture_id", "status", "amount", "currency"}
+        self.assertEqual(keys, expected)
+
     def test_paypal_failure_marks_persisted_order_failed(self):
         failing = OrderService(self.store, FakePayPal(fail=True), "https://example.test/return", "https://example.test/cancel")
         response = create_app(order_service=failing).test_client().post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"private":"brief"}})
         self.assertEqual(response.status_code, 502)
         self.assertNotIn("brief", response.json["error"])
-        self.assertEqual(self.store.get_by_local_order_id(next(iter([r.local_order_id for r in [self.store.get_by_paypal_order_id("missing")] if r])) if False else "missing"), None)
     def test_forbidden_internal_field_is_rejected(self):
         response = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{},"status":"PAID"})
         self.assertEqual(response.status_code, 422)
@@ -59,7 +381,7 @@ class OrdersApiTests(unittest.TestCase):
         paypal = AmbiguousPayPal()
         service = OrderService(self.store, paypal, "https://example.test/return", "https://example.test/cancel")
         response = create_app(order_service=service).test_client().post("/api/paypal/orders", json={"product":"custom-song","solo":"none","brief":{"private":"brief"}})
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 503)  # Changed from 502 to 503 for ambiguous
         self.assertEqual(len(paypal.calls), 1)
         import sqlite3
         connection = sqlite3.connect(self.store._database_path)

@@ -16,7 +16,7 @@ Algunas funciones requieren conexión a Internet porque utilizan TidyCal y Forms
 
 ## Base local del backend
 
-El proyecto incluye una base Flask para el futuro checkout de Custom Song. PayPal todavía no está conectado: las rutas actuales solo validan la configuración y calculan el precio del lado servidor.
+El proyecto incluye una base Flask para el checkout de Custom Song. Los endpoints backend para Create y Capture ya están implementados y usan SQLite durable para persistencia local. PayPal Sandbox/Live no está conectado al frontend todavía: las pruebas automatizadas usan clientes falsos/mock.
 
 Desde la raíz del proyecto, crea un entorno virtual e instala la dependencia:
 
@@ -50,4 +50,4 @@ python -m backend.paypal_sandbox_smoke capture <ORDER_ID> --solo guitar-solo
 
 `auth` confirma OAuth sin mostrar el access token. `create --solo` acepta únicamente configuraciones de solo cerradas; `pricing.py` determina el importe y el operador nunca introduce precio. Abre la URL de aprobación con un comprador Personal Sandbox, aprueba la misma orden y conserva su Order ID. Usa la misma opción `--solo` al capturar; el runner solo muestra `PAYMENT CONFIRMED` cuando los estados, importe y moneda esperados coinciden. El runner se niega a ejecutarse con `PAYPAL_ENVIRONMENT=live`.
 
-El backend ya cuenta con una persistencia SQLite local mínima para futuras órdenes Custom Song; su archivo de desarrollo vive fuera de Git bajo `instance/`. Todavía no está conectada al frontend ni a los endpoints PayPal reales de Flask.
+El backend usa SQLite durable para persistencia de órdenes Custom Song; su archivo de desarrollo vive fuera de Git bajo `instance/`. Los endpoints Flask para Create y Capture ya están implementados y son pruebas automatizadas. El smoke runner Sandbox sigue siendo una herramienta separada para pruebas manuales.

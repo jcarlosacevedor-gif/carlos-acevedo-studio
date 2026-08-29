@@ -14,7 +14,16 @@ from .paypal_client import PayPalClient
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ORDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9]{1,36}$")
+
+# For Capture endpoint: reject any attempt to supply business fields from the browser.
+CAPTURE_FORBIDDEN_FIELDS = frozenset({
+    "amount", "amount_cents", "price", "total", "currency", "quantity",
+    "paypal_order_id", "capture_id", "status",
+    "create_request_id", "capture_request_id",
+})
+
+# Local order IDs are UUID strings (36 chars with hyphens)
+LOCAL_ORDER_ID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
 
 class _DeferredPayPalClient:
@@ -72,14 +81,33 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
         except OrderServiceError as error:
             raise APIError(str(error), error.status_code) from error
 
-    @app.post("/api/paypal/orders/<order_id>/capture")
-    def capture_order_placeholder(order_id: str):
-        if not ORDER_ID_PATTERN.fullmatch(order_id):
-            raise APIError("Invalid PayPal order ID.", 400)
-        return jsonify({
-            "status": "not_implemented",
-            "message": "PayPal capture is not connected yet.",
-        }), 501
+    @app.post("/api/paypal/orders/<local_order_id>/capture")
+    def capture_order(local_order_id: str):
+        # Validate local_order_id format (UUID)
+        if not LOCAL_ORDER_ID_PATTERN.fullmatch(local_order_id):
+            raise APIError("Invalid local order ID.", 400)
+
+        # Validate body: empty, empty JSON object {}, or no body at all
+        if request.data and request.content_length:
+            if not request.is_json:
+                raise APIError("Capture endpoint expects empty body or JSON.", 400)
+            try:
+                payload = request.get_json()
+            except BadRequest as error:
+                raise APIError("Invalid JSON body.", 400) from error
+            if not isinstance(payload, dict):
+                raise APIError("A JSON object is required.", 400)
+
+            # Capture receives zero business fields - reject any non-empty JSON object
+            if payload:
+                raise APIError("Capture endpoint does not accept request body data.", 400)
+
+        try:
+            result = service_for_request().capture_order(local_order_id)
+        except OrderServiceError as error:
+            raise APIError(str(error), error.status_code) from error
+
+        return jsonify(result), 200
 
     return app
 

@@ -52,7 +52,7 @@ class OrderService:
             remote = self._paypal_client.create_order(record.amount_cents, record.currency, record.create_request_id, return_url=self._return_url, cancel_url=self._cancel_url)
             order_id, approval_url = remote["order_id"], remote["approval_url"]
         except PayPalAmbiguousResultError as error:
-            raise OrderServiceError("PayPal order creation outcome requires recovery.", 502) from error
+            raise OrderServiceError("PayPal order creation outcome requires recovery.", 503) from error
         except (KeyError, TypeError, PayPalClientError, RuntimeError) as error:
             self._store.mark_failed(record.local_order_id)
             raise OrderServiceError("PayPal order creation failed.", 502) from error
@@ -105,7 +105,7 @@ class OrderService:
         try:
             paypal_order = self._paypal_client.show_order(record.paypal_order_id)
         except PayPalAmbiguousResultError as error:
-            raise OrderServiceError("PayPal order lookup outcome requires recovery.", 502) from error
+            raise OrderServiceError("PayPal order lookup outcome requires recovery.", 503) from error
         except PayPalClientError as error:
             raise OrderServiceError("PayPal order lookup failed.", 502) from error
 
@@ -156,7 +156,7 @@ class OrderService:
                 except PayPalAmbiguousResultError as error:
                     # Step 13: RESULTADO AMBIGUO
                     raise OrderServiceError(
-                        "Capture outcome is uncertain; order remains CAPTURING.", 502
+                        "Capture outcome is uncertain; order remains CAPTURING.", 503
                     ) from error
                 except PayPalClientError as error:
                     # Step 14: FALLO DETERMINISTA DE CAPTURE
@@ -224,7 +224,7 @@ class OrderService:
                 )
             except PayPalAmbiguousResultError as error:
                 raise OrderServiceError(
-                    "Capture outcome is uncertain; order remains CAPTURING.", 502
+                    "Capture outcome is uncertain; order remains CAPTURING.", 503
                 ) from error
             except PayPalClientError as error:
                 try:

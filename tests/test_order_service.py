@@ -270,7 +270,7 @@ class OrderServiceCaptureTests(unittest.TestCase):
 
         with self.assertRaises(OrderServiceError) as ctx:
             self.service.capture_order(record.local_order_id)
-        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.status_code, 503)
         self.assertIn("recovery", str(ctx.exception))
         self.paypal_client.capture_order.assert_not_called()
 
@@ -289,7 +289,7 @@ class OrderServiceCaptureTests(unittest.TestCase):
 
         with self.assertRaises(OrderServiceError) as ctx:
             self.service.capture_order(record.local_order_id)
-        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.status_code, 503)
         self.assertIn("uncertain", str(ctx.exception))
 
     # --- DETERMINISTIC CAPTURE FAILURE ---
@@ -496,7 +496,7 @@ class OrderServiceCaptureTests(unittest.TestCase):
 
         with self.assertRaises(OrderServiceError) as ctx:
             self.service.capture_order(record.local_order_id)
-        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.status_code, 503)
         # Verify CAPTURING persists
         reloaded = self.store.get_by_local_order_id(record.local_order_id)
         self.assertEqual(reloaded.status, "CAPTURING")
@@ -519,7 +519,7 @@ class OrderServiceCaptureTests(unittest.TestCase):
 
         with self.assertRaises(OrderServiceError) as ctx:
             self.service.capture_order(record.local_order_id)
-        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.status_code, 503)
         reloaded = self.store.get_by_local_order_id(record.local_order_id)
         self.assertEqual(reloaded.status, "CAPTURING")
 
@@ -538,7 +538,7 @@ class OrderServiceCaptureTests(unittest.TestCase):
 
         with self.assertRaises(OrderServiceError) as ctx:
             self.service.capture_order(record.local_order_id)
-        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.status_code, 503)
         reloaded = self.store.get_by_local_order_id(record.local_order_id)
         self.assertEqual(reloaded.status, "CAPTURING")
 
