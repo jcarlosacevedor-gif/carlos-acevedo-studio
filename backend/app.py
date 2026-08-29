@@ -83,6 +83,14 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
     def home_page():
         return send_from_directory(PROJECT_ROOT, "index.html")
 
+    @app.get("/paypal/return")
+    def paypal_return_page():
+        return send_from_directory(PROJECT_ROOT, "paypal-return.html")
+
+    @app.get("/paypal/cancel")
+    def paypal_cancel_page():
+        return send_from_directory(PROJECT_ROOT, "paypal-cancel.html")
+
     @app.get("/api/paypal/orders/resolve")
     def resolve_paypal_order():
         token = request.args.get("token")

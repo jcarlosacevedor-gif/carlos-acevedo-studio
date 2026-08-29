@@ -2914,9 +2914,90 @@ body.custom-song-modal-open {
   }
 }
 
+/* ==========================================================================
+   PayPal Return & Cancel Pages
+   ========================================================================== */
 
+.paypal-return-container,
+.paypal-cancel-container {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+}
 
+.paypal-return-card,
+.paypal-cancel-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  padding: 48px;
+  max-width: 540px;
+  width: 100%;
+  text-align: center;
+}
 
+.paypal-return-card h1,
+.paypal-cancel-card h1 {
+  font-size: 1.875rem;
+  line-height: 1.33;
+  margin-bottom: 16px;
+  color: #1a1a1a;
+}
 
+.paypal-return-card p,
+.paypal-cancel-card p {
+  color: #525252;
+  margin-bottom: 32px;
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
 
+.paypal-return-message {
+  min-height: 24px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.paypal-return-result {
+  margin-top: 32px;
+}
+
+.paypal-return-amount {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 32px;
+}
+
+.paypal-return-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.paypal-return-actions .button {
+  min-width: 180px;
+}
+
+/* ==========================================================================
+   Site Footer
+   ========================================================================== */
+
+.site-footer {
+  background: #fafafa;
+  border-top: 1px solid #e5e5e5;
+  padding: 32px 0;
+  margin-top: 64px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.site-footer .container {
+  display: block;
+}
 

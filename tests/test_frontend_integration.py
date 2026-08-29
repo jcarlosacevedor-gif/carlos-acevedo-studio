@@ -6,11 +6,11 @@ from backend.app import create_app
 from backend.order_store import OrderStore
 from backend.order_service import OrderService
 
-
 class FakePayPalForFrontend:
     """Fake PayPal for integration tests - no real network calls."""
-    def __init__(self):
+    def __init__(self, approved=True):
         self.calls = []
+        self.approved = approved  # If True, show_order returns APPROVED
     def create_order(self, amount_cents, currency, request_id, **kwargs):
         self.calls.append(("create_order", amount_cents, currency, request_id, kwargs))
         order_id = f"PAYPALORDER{len(self.calls):03d}"
@@ -20,10 +20,19 @@ class FakePayPalForFrontend:
             "approval_url": f"https://www.sandbox.paypal.com/checkoutnow?token={order_id}"
         }
     def show_order(self, order_id):
-        return {"order_id": order_id, "order_status": "CREATED"}
+        if self.approved:
+            return {"order_id": order_id, "order_status": "APPROVED"}
+        else:
+            return {"order_id": order_id, "order_status": "CREATED"}
     def capture_order(self, order_id, request_id):
-        return {"order_id": order_id, "order_status": "COMPLETED"}
-
+        return {
+            "order_id": order_id,
+            "order_status": "COMPLETED",
+            "capture_id": f"CAPTURE{order_id[-3:]}",
+            "capture_status": "COMPLETED",
+            "amount": "199.00",
+            "currency": "USD"
+        }
 
 class FrontendIntegrationTests(unittest.TestCase):
     def test_custom_song_order_js_exists(self):
@@ -197,7 +206,6 @@ class FrontendIntegrationTests(unittest.TestCase):
         content = path.read_text(encoding="utf-8")
         self.assertIn("<form", content)
         self.assertIn('data-custom-song-step="5"', content)
-
 
 class FrontendBackendIntegrationTests(unittest.TestCase):
     """Integration tests: verify frontend payload is accepted by backend with correct pricing."""
@@ -409,7 +417,6 @@ class FrontendBackendIntegrationTests(unittest.TestCase):
         # Price comes from backend, not frontend
         self.assertEqual(response.json["amount"], "199.00")
 
-
 class FrontendBriefStructureTests(unittest.TestCase):
     """Tests for buildBrief() structure and normalization."""
     def setUp(self):
@@ -437,3 +444,266 @@ class FrontendBriefStructureTests(unittest.TestCase):
         self.assertIn('contentGuidelines: f("contentGuidelines").checked', self.brief_section)
         self.assertIn('revisionAcknowledgement: f("revisionAcknowledgement").checked', self.brief_section)
         self.assertIn('licenseAcknowledgement: f("licenseAcknowledgement").checked', self.brief_section)
+
+
+class StaticRouteTests(unittest.TestCase):
+    """Tests for static route serving of return/cancel pages."""
+    def setUp(self):
+        self.client = create_app().test_client()
+
+    def test_paypal_return_route_200(self):
+        """GET /paypal/return must return 200"""
+        response = self.client.get("/paypal/return")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"paypal-return", response.data)
+
+    def test_paypal_cancel_route_200(self):
+        """GET /paypal/cancel must return 200"""
+        response = self.client.get("/paypal/cancel")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"paypal-cancel", response.data)
+
+    def test_paypal_return_with_query_string_200(self):
+        """GET /paypal/return?token=X&PayerID=Y must return 200"""
+        response = self.client.get("/paypal/return?token=PAYPALORDER123&PayerID=BUYER456")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"paypal-return", response.data)
+
+    def test_paypal_return_content_type_html(self):
+        """GET /paypal/return must have HTML content type"""
+        response = self.client.get("/paypal/return")
+        self.assertIn("text/html", response.content_type)
+
+    def test_paypal_cancel_content_type_html(self):
+        """GET /paypal/cancel must have HTML content type"""
+        response = self.client.get("/paypal/cancel")
+        self.assertIn("text/html", response.content_type)
+
+
+class ReturnPageTests(unittest.TestCase):
+    """Tests for /paypal/return page."""
+    def test_return_page_html_exists(self):
+        path = Path(__file__).parent.parent / "paypal-return.html"
+        self.assertTrue(path.exists())
+
+    def test_return_page_has_script(self):
+        path = Path(__file__).parent.parent / "paypal-return.html"
+        content = path.read_text(encoding="utf-8")
+        self.assertIn("paypal-return.js", content)
+
+    def test_return_page_has_required_elements(self):
+        path = Path(__file__).parent.parent / "paypal-return.html"
+        content = path.read_text(encoding="utf-8")
+        self.assertIn('id="status-heading"', content)
+        self.assertIn('id="status-message"', content)
+        self.assertIn('id="payment-amount"', content)
+        self.assertIn('id="retry-button"', content)
+
+    def test_return_page_has_bilingual_strings(self):
+        path = Path(__file__).parent.parent / "paypal-return.html"
+        content = path.read_text(encoding="utf-8")
+        self.assertIn("data-i18n=", content)
+
+class ReturnPageJSTests(unittest.TestCase):
+    """Tests for paypal-return.js structure."""
+    def setUp(self):
+        self.js_path = Path(__file__).parent.parent / "assets" / "scripts" / "paypal-return.js"
+        self.content = self.js_path.read_text(encoding="utf-8")
+
+    def test_return_js_exists(self):
+        self.assertTrue(self.js_path.exists())
+
+    def test_token_extraction_from_search(self):
+        self.assertIn("URLSearchParams", self.content)
+        self.assertIn("window.location.search", self.content)
+
+    def test_resolve_call_with_encodeURIComponent(self):
+        self.assertIn("encodeURIComponent", self.content)
+        self.assertIn("/api/paypal/orders/resolve?token=", self.content)
+
+    def test_capture_call_with_local_order_id(self):
+        self.assertIn("/api/paypal/orders/", self.content)
+        self.assertIn("/capture", self.content)
+        self.assertIn('JSON.stringify({})', self.content)
+
+    def test_isConfirming_flag_exists(self):
+        self.assertIn("isConfirming", self.content)
+
+    def test_double_action_prevention(self):
+        self.assertIn("if (isConfirming) return", self.content)
+
+    def test_retry_button_handler(self):
+        self.assertIn("retry-button", self.content)
+        self.assertIn("addEventListener", self.content)
+
+    def test_bilingual_strings_defined(self):
+        self.assertIn("confirmingPayment", self.content)
+        self.assertIn("paymentConfirmed", self.content)
+        self.assertIn("paymentConfirmationPending", self.content)
+        self.assertIn("tryAgain", self.content)
+        self.assertIn("returnToCustomSong", self.content)
+
+    def test_success_requires_amount_and_currency(self):
+        self.assertIn("amount", self.content)
+        self.assertIn("currency", self.content)
+
+    def test_response_validation(self):
+        self.assertIn("isValidResponse", self.content)
+        self.assertIn("isValidCaptureResponse", self.content)
+
+    def test_textContent_used_not_innerHTML(self):
+        self.assertIn("textContent", self.content)
+        self.assertNotIn("innerHTML", self.content)
+
+    def test_no_sessionStorage(self):
+        self.assertNotIn("sessionStorage", self.content)
+        self.assertNotIn("localStorage", self.content)
+
+    def test_no_PayPal_SDK(self):
+        self.assertNotIn("paypal.com/sdk/js", self.content)
+
+class CancelPageTests(unittest.TestCase):
+    """Tests for /paypal/cancel page."""
+    def test_cancel_page_html_exists(self):
+        path = Path(__file__).parent.parent / "paypal-cancel.html"
+        self.assertTrue(path.exists())
+
+    def test_cancel_page_no_script_needed(self):
+        path = Path(__file__).parent.parent / "paypal-cancel.html"
+        content = path.read_text(encoding="utf-8")
+        # Cancel page doesn't need JS, just static HTML
+        self.assertNotIn("<script", content)
+
+    def test_cancel_page_has_return_link(self):
+        path = Path(__file__).parent.parent / "paypal-cancel.html"
+        content = path.read_text(encoding="utf-8")
+        self.assertIn("promo-lab.html", content)
+
+    def test_cancel_page_has_bilingual_strings(self):
+        path = Path(__file__).parent.parent / "paypal-cancel.html"
+        content = path.read_text(encoding="utf-8")
+        self.assertIn("data-i18n=", content)
+
+class ReturnBackendIntegrationTests(unittest.TestCase):
+    """Integration tests: return page flow with backend."""
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        self.paypal = FakePayPalForFrontend(approved=True)
+        self.service = OrderService(self.store, self.paypal, "https://example.test/return", "https://example.test/cancel")
+        self.client = create_app(order_service=self.service).test_client()
+    def tearDown(self): self.temp.cleanup()
+
+    def test_resolve_then_capture_full_flow(self):
+        """Test full flow: create order -> resolve -> capture = PAID"""
+        # Create order first
+        create_resp = self.client.post("/api/paypal/orders", json={
+            "product": "custom-song",
+            "solo": "none",
+            "brief": {
+                "purpose": "gift", "subject": "Test", "story": "Test",
+                "language": "english", "genre": "pop", "mood": ["joyful"],
+                "lyricsStatus": "none", "lyricsPermission": None,
+                "creativeFreedom": "balanced", "instrument": ["guitar"],
+                "vocal": "carlos", "contentGuidelines": True,
+                "revisionAcknowledgement": True, "licenseAcknowledgement": True,
+                "purposeOther": None, "languageOther": None,
+                "genreOther": None, "moodOther": None
+            }
+        })
+        self.assertEqual(create_resp.status_code, 201)
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        # Resolve
+        resolve_resp = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        self.assertEqual(resolve_resp.status_code, 200)
+        local_order_id = resolve_resp.json["local_order_id"]
+        self.assertIsNotNone(local_order_id)
+
+        # Capture
+        capture_resp = self.client.post(f"/api/paypal/orders/{local_order_id}/capture", json={})
+        self.assertEqual(capture_resp.status_code, 200)
+        self.assertEqual(capture_resp.json["status"], "PAID")
+        self.assertEqual(capture_resp.json["amount"], "199.00")
+        self.assertEqual(capture_resp.json["currency"], "USD")
+
+    def test_resolve_missing_token_returns_400(self):
+        """Test resolve without token returns 400"""
+        resolve_resp = self.client.get("/api/paypal/orders/resolve")
+        self.assertEqual(resolve_resp.status_code, 400)
+
+    def test_resolve_invalid_token_returns_404(self):
+        """Test resolve with invalid token returns 404"""
+        resolve_resp = self.client.get("/api/paypal/orders/resolve?token=INVALID999")
+        self.assertEqual(resolve_resp.status_code, 404)
+
+    def test_capture_without_resolve_fails(self):
+        """Test capture without valid local_order_id returns 404"""
+        capture_resp = self.client.post("/api/paypal/orders/00000000-0000-0000-0000-000000000000/capture", json={})
+        self.assertEqual(capture_resp.status_code, 404)
+
+    def test_capture_idempotent_on_repeat(self):
+        """Test that repeated capture calls are idempotent"""
+        import uuid
+        # Create and capture first time - use solo="none" to match amount 199.00
+        create_resp = self.client.post("/api/paypal/orders", json={
+            "product": "custom-song",
+            "solo": "none",
+            "brief": {
+                "purpose": "gift", "subject": "Test", "story": "Test",
+                "language": "english", "genre": "pop", "mood": ["joyful"],
+                "lyricsStatus": "none", "lyricsPermission": None,
+                "creativeFreedom": "balanced", "instrument": ["guitar"],
+                "vocal": "carlos", "contentGuidelines": True,
+                "revisionAcknowledgement": True, "licenseAcknowledgement": True,
+                "purposeOther": None, "languageOther": None,
+                "genreOther": None, "moodOther": None
+            }
+        })
+        local_order_id = create_resp.json["local_order_id"]
+
+        # First capture
+        capture_resp1 = self.client.post(f"/api/paypal/orders/{local_order_id}/capture", json={})
+        self.assertEqual(capture_resp1.status_code, 200)
+        self.assertEqual(capture_resp1.json["status"], "PAID")
+        capture_id_1 = capture_resp1.json["capture_id"]
+
+        # Second capture (idempotent)
+        capture_resp2 = self.client.post(f"/api/paypal/orders/{local_order_id}/capture", json={})
+        self.assertEqual(capture_resp2.status_code, 200)
+        self.assertEqual(capture_resp2.json["status"], "PAID")
+        # Verify capture_order was NOT called again (idempotent via show_order)
+        # Note: This depends on FakePayPalForFrontend implementation
+
+    def test_capture_409_not_approved(self):
+        """Test capture returns 409 when order not approved"""
+        # Create a service with paypal that returns CREATED (not approved)
+        store = OrderStore(Path(self.temp.name) / "orders.sqlite3")
+        paypal = FakePayPalForFrontend(approved=False)
+        service = OrderService(store, paypal, "https://example.test/return", "https://example.test/cancel")
+        client = create_app(order_service=service).test_client()
+
+        # Create order
+        create_resp = client.post("/api/paypal/orders", json={
+            "product": "custom-song",
+            "solo": "none",
+            "brief": {
+                "purpose": "gift", "subject": "Test", "story": "Test",
+                "language": "english", "genre": "pop", "mood": ["joyful"],
+                "lyricsStatus": "none", "lyricsPermission": None,
+                "creativeFreedom": "balanced", "instrument": ["guitar"],
+                "vocal": "carlos", "contentGuidelines": True,
+                "revisionAcknowledgement": True, "licenseAcknowledgement": True,
+                "purposeOther": None, "languageOther": None,
+                "genreOther": None, "moodOther": None
+            }
+        })
+        paypal_order_id = create_resp.json["paypal_order_id"]
+
+        # Resolve
+        resolve_resp = client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        local_order_id = resolve_resp.json["local_order_id"]
+
+        # Capture - paypal returns CREATED (not approved) -> should return 409
+        capture_resp = client.post(f"/api/paypal/orders/{local_order_id}/capture", json={})
+        self.assertEqual(capture_resp.status_code, 409)

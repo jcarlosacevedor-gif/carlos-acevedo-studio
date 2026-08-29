@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Confirmation - Carlos Acevedo Studio</title>
+  <link rel="stylesheet" href="assets/styles/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="site-brand" href="index.html" aria-label="Carlos Acevedo Studio home">
+        <img src="assets/images/Logotipo_Zoom.png" alt="Carlos Acevedo Studio logo">
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="premium-services.html">Services</a>
+        <a href="blog.html">Blog</a>
+        <a href="booking.html">Booking</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="paypal-return-container">
+      <div class="paypal-return-card">
+        <h1 id="status-heading" data-i18n="confirmingPayment">Confirming your payment...</h1>
+        <p id="status-message" class="paypal-return-message"></p>
+
+        <div id="payment-result" class="paypal-return-result" hidden>
+          <div id="payment-amount" class="paypal-return-amount"></div>
+          <button type="button" class="button button-primary" id="retry-button" data-i18n="tryAgain" hidden>Try again</button>
+        </div>
+
+        <div id="return-actions" class="paypal-return-actions">
+          <a href="promo-lab.html" class="button button-secondary" data-i18n="returnToCustomSong">Return to Custom Song</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; 2025 Carlos Acevedo Studio</p>
+    </div>
+  </footer>
+
+  <script src="assets/scripts/paypal-return.js"></script>
+</body>
+</html>
