@@ -30,6 +30,12 @@ class _DeferredPayPalClient:
     def create_order(self, *args, **kwargs):
         return PayPalClient.from_environment().create_order(*args, **kwargs)
 
+    def show_order(self, *args, **kwargs):
+        return PayPalClient.from_environment().show_order(*args, **kwargs)
+
+    def capture_order(self, *args, **kwargs):
+        return PayPalClient.from_environment().capture_order(*args, **kwargs)
+
 
 def _json_object() -> dict[str, object]:
     if not request.is_json:

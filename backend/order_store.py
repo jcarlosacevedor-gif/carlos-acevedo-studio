@@ -82,9 +82,91 @@ class OrderStore:
 
     def _initialize(self) -> None:
         with self._connection() as connection:
+            # Check if table exists
+            table_info = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_song_orders'"
+            ).fetchone()
+
+            if table_info is None:
+                # Table doesn't exist, create with current schema
+                connection.execute(
+                    """
+                    CREATE TABLE custom_song_orders (
+                        id INTEGER PRIMARY KEY,
+                        local_order_id TEXT NOT NULL UNIQUE,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        product TEXT NOT NULL,
+                        solo TEXT NOT NULL,
+                        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                        currency TEXT NOT NULL CHECK (length(currency) > 0),
+                        brief_json TEXT NOT NULL,
+                        paypal_order_id TEXT UNIQUE,
+                        paypal_capture_id TEXT UNIQUE,
+                        status TEXT NOT NULL CHECK (status IN ('PENDING', 'PAYPAL_CREATED', 'CAPTURING', 'PAID', 'FAILED', 'CANCELLED')),
+                        create_request_id TEXT NOT NULL,
+                        capture_request_id TEXT
+                    )
+                    """
+                )
+            else:
+                # Table exists, check if migration is needed
+                self._migrate_if_needed(connection)
+
+    def _migrate_if_needed(self, connection: sqlite3.Connection) -> None:
+        """Check schema and migrate if needed from legacy (without CAPTURING) to current."""
+        # Get the current CHECK constraint for status column
+        # SQLite doesn't have a direct way to query CHECK constraints, so we use PRAGMA
+        # and check the sql create statement
+        create_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='custom_song_orders'"
+        ).fetchone()
+
+        if create_sql is None:
+            return
+
+        create_sql_str = create_sql[0].lower()
+
+        # Check if CAPTURING is already in the CHECK constraint
+        if "'capturing'" in create_sql_str or '"capturing"' in create_sql_str:
+            # Schema already has CAPTURING, no migration needed
+            return
+
+        # Check if this is a known legacy schema (without CAPTURING but with other expected states)
+        has_pending = "'pending'" in create_sql_str or '"pending"' in create_sql_str
+        has_paypal_created = "'paypal_created'" in create_sql_str or '"paypal_created"' in create_sql_str
+        has_paid = "'paid'" in create_sql_str or '"paid"' in create_sql_str
+        has_failed = "'failed'" in create_sql_str or '"failed"' in create_sql_str
+        has_cancelled = "'cancelled'" in create_sql_str or '"cancelled"' in create_sql_str
+        has_capture_request_id = "capture_request_id" in create_sql_str
+
+        if not (has_pending and has_paypal_created and has_paid and has_failed and has_cancelled):
+            # Unknown schema - fail safely
+            raise OrderStoreError(
+                "Incompatible database schema detected. "
+                "The custom_song_orders table has an unexpected structure. "
+                "Manual recovery required."
+            )
+
+        if not has_capture_request_id:
+            # Unknown schema without capture_request_id column
+            raise OrderStoreError(
+                "Incompatible database schema detected: missing capture_request_id column. "
+                "Manual recovery required."
+            )
+
+        # This is a known legacy schema without CAPTURING - perform migration
+        self._migrate_legacy_schema(connection, create_sql_str)
+
+    def _migrate_legacy_schema(self, connection: sqlite3.Connection, create_sql_str: str) -> None:
+        """Migrate from legacy schema (without CAPTURING) to current schema."""
+        connection.execute("BEGIN EXCLUSIVE")
+
+        try:
+            # Create new table with updated schema
             connection.execute(
                 """
-                CREATE TABLE IF NOT EXISTS custom_song_orders (
+                CREATE TABLE custom_song_orders_new (
                     id INTEGER PRIMARY KEY,
                     local_order_id TEXT NOT NULL UNIQUE,
                     created_at TEXT NOT NULL,
@@ -102,6 +184,43 @@ class OrderStore:
                 )
                 """
             )
+
+            # Copy all data explicitly
+            connection.execute(
+                """
+                INSERT INTO custom_song_orders_new (
+                    id, local_order_id, created_at, updated_at, product, solo,
+                    amount_cents, currency, brief_json, paypal_order_id, paypal_capture_id,
+                    status, create_request_id, capture_request_id
+                ) SELECT
+                    id, local_order_id, created_at, updated_at, product, solo,
+                    amount_cents, currency, brief_json, paypal_order_id, paypal_capture_id,
+                    status, create_request_id, capture_request_id
+                FROM custom_song_orders
+                """
+            )
+
+            # Verify copy
+            old_count = connection.execute("SELECT COUNT(*) FROM custom_song_orders").fetchone()[0]
+            new_count = connection.execute("SELECT COUNT(*) FROM custom_song_orders_new").fetchone()[0]
+
+            if old_count != new_count:
+                raise OrderStoreError(
+                    f"Migration copy verification failed: {old_count} rows in old table, "
+                    f"{new_count} rows in new table."
+                )
+
+            # Drop old table
+            connection.execute("DROP TABLE custom_song_orders")
+
+            # Rename new table
+            connection.execute("ALTER TABLE custom_song_orders_new RENAME TO custom_song_orders")
+
+            connection.execute("COMMIT")
+
+        except Exception:
+            connection.rollback()
+            raise
 
     @staticmethod
     def _now() -> str:
