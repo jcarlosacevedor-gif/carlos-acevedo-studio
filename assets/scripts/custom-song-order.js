@@ -54,16 +54,16 @@
     result.moodOther = null;
 
     if (checked("purpose") === "other") {
-      result.purposeOther = f("purposeOther").value.trim();
+      result.purposeOther = f("purposeOther").value.trim() || null;
     }
     if (checked("language") === "other") {
-      result.languageOther = f("languageOther").value.trim();
+      result.languageOther = f("languageOther").value.trim() || null;
     }
     if (f("genre").value === "other") {
-      result.genreOther = f("genreOther").value.trim();
+      result.genreOther = f("genreOther").value.trim() || null;
     }
     if (checks("mood").includes("other")) {
-      result.moodOther = f("moodOther").value.trim();
+      result.moodOther = f("moodOther").value.trim() || null;
     }
 
     // Handle optional text fields
@@ -131,7 +131,6 @@
           brief: brief
         })
       });
-
       if (!response.ok) {
         let errorMessage = t("orderCreationFailed");
         try {
@@ -158,10 +157,15 @@
         throw new Error(t("orderCreationFailed"));
       }
 
-      // Redirect to PayPal approval URL
+      // Redirect to PayPal approval URL - this is intentional navigation
+      // Mark the brief as committed by hiding the modal, so dirty check doesn't block
+      modal.hidden = true;
+      document.body.classList.remove("custom-song-modal-open");
+      document.querySelectorAll("body>header,body>main").forEach(e=>e.inert=false);
       window.location.assign(data.approval_url);
 
     } catch (err) {
+      console.error("Custom Song order creation failed.");
       error.textContent = err.message;
       next.disabled = false;
       next.textContent = step === 5 ? t("reviewComplete") : t("continue");
@@ -172,7 +176,9 @@
   open.addEventListener("click",()=>{opener=document.activeElement;reset();modal.hidden=false;document.body.classList.add("custom-song-modal-open");document.querySelectorAll("body>header,body>main").forEach(e=>e.inert=true);setTimeout(()=>modal.querySelector("[data-custom-song-close]").focus(),0);});modal.querySelectorAll("[data-custom-song-close]").forEach(b=>b.addEventListener("click",()=>close()));modal.querySelector("[data-custom-song-finish]").addEventListener("click",()=>close(true));back.addEventListener("click",()=>show(step-1));
 
   // Modified next button handler for step 5
-  next.addEventListener("click", async ()=>{
+  next.addEventListener("click", async (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
     if (!validate()) return;
     if (step < 5) {
       show(step + 1);

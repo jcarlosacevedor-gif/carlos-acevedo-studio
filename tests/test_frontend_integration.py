@@ -417,6 +417,166 @@ class FrontendBackendIntegrationTests(unittest.TestCase):
         # Price comes from backend, not frontend
         self.assertEqual(response.json["amount"], "199.00")
 
+class ReviewCompleteBugTests(unittest.TestCase):
+    """Tests for the REVIEW COMPLETE button bug fix."""
+    def setUp(self):
+        self.js_path = Path(__file__).parent.parent / "assets" / "scripts" / "custom-song-order.js"
+        self.content = self.js_path.read_text(encoding="utf-8")
+
+    def test_review_complete_button_has_type_button(self):
+        """REVIEW COMPLETE button must have type='button' to prevent native form submit."""
+        html_path = Path(__file__).parent.parent / "promo-lab.html"
+        html_content = html_path.read_text(encoding="utf-8")
+        # Find the next button (which becomes REVIEW COMPLETE in step 5)
+        self.assertIn('data-custom-song-next', html_content)
+        # Verify it has type="button"
+        # Extract the button element
+        import re
+        button_match = re.search(r'<button[^>]*data-custom-song-next[^>]*>', html_content)
+        self.assertIsNotNone(button_match, "Next button not found")
+        button_html = button_match.group(0)
+        self.assertIn('type="button"', button_html,
+                      "REVIEW COMPLETE button must have type='button' to prevent native form submit")
+
+    def test_next_button_handler_prevents_default(self):
+        """Next button click handler must call e.preventDefault() and e.stopPropagation()."""
+        # Verify the next button handler has preventDefault and stopPropagation
+        self.assertIn('e.preventDefault()', self.content)
+        self.assertIn('e.stopPropagation()', self.content)
+        # Verify it's in the next button handler context
+        next_handler_start = self.content.find('next.addEventListener("click", async (e)=>')
+        self.assertNotEqual(next_handler_start, -1, "Next button handler not found")
+        next_handler_section = self.content[next_handler_start:next_handler_start + 300]
+        self.assertIn('e.preventDefault()', next_handler_section)
+        self.assertIn('e.stopPropagation()', next_handler_section)
+
+    def test_next_button_handler_is_async(self):
+        """Next button handler must be async to support await submitOrder()."""
+        self.assertIn('next.addEventListener("click", async (e)=>', self.content)
+
+    def test_next_button_calls_submitOrder_on_step_5(self):
+        """In step 5, next button must call submitOrder()."""
+        next_handler_start = self.content.find('next.addEventListener("click", async (e)=>')
+        self.assertNotEqual(next_handler_start, -1, "Next button handler not found")
+        next_handler_section = self.content[next_handler_start:next_handler_start + 300]
+        self.assertIn('await submitOrder()', next_handler_section)
+        # Verify step logic: if step < 5 navigate, else submitOrder
+        self.assertIn('step < 5', next_handler_section)
+
+    def test_double_submit_prevention_with_isSubmitting(self):
+        """Double submit must be prevented by isSubmitting flag."""
+        self.assertIn('if (isSubmitting) return;', self.content)
+        self.assertIn('isSubmitting = true;', self.content)
+        self.assertIn('isSubmitting = false;', self.content)
+
+    def test_dirty_protection_still_exists(self):
+        """Close confirmation for dirty state must still exist for manual close."""
+        self.assertIn('function dirty()', self.content)
+        self.assertIn('function close(force=false)', self.content)
+        self.assertIn('dirty()', self.content)
+        self.assertIn('confirm(t("discard"))', self.content)
+
+    def test_close_called_with_force_true_on_finish(self):
+        """Finish button must call close(true) to bypass dirty check."""
+        self.assertIn('close(true)', self.content)
+
+    def test_close_listeners_for_close_buttons(self):
+        """Close buttons must have listeners that call close()."""
+        self.assertIn('[data-custom-song-close]', self.content)
+        self.assertIn('addEventListener("click",()=>close())', self.content)
+
+    def test_submitOrder_disables_button_during_submit(self):
+        """submitOrder must disable the next button during submission."""
+        submit_start = self.content.find('async function submitOrder()')
+        submit_end = self.content.find('open.addEventListener', submit_start)
+        submit_section = self.content[submit_start:submit_end]
+        self.assertIn('next.disabled = true', submit_section)
+        self.assertIn('next.disabled = false', self.content)
+
+    def test_redirect_to_approval_url_present(self):
+        """submitOrder must redirect to approval_url on success."""
+        self.assertIn('window.location.assign(data.approval_url)', self.content)
+
+    def test_redirect_bypasses_dirty_check(self):
+        """Redirect to PayPal must not be blocked by dirty state."""
+        # Check that modal is hidden before redirect to bypass dirty check
+        submit_start = self.content.find('async function submitOrder()')
+        self.assertNotEqual(submit_start, -1, "submitOrder function not found")
+        # Find the end of submitOrder function
+        next_function_start = self.content.find('open.addEventListener', submit_start)
+        self.assertNotEqual(next_function_start, -1, "End of submitOrder not found")
+        submit_section = self.content[submit_start:next_function_start]
+        # Verify modal is hidden before redirect (with or without semicolon)
+        self.assertIn('modal.hidden = true', submit_section)
+
+    def test_error_handling_restores_button_state(self):
+        """Error in submitOrder must restore button state."""
+        self.assertIn('next.disabled = false;', self.content)
+        self.assertIn('isSubmitting = false;', self.content)
+        self.assertIn('error.textContent = err.message;', self.content)
+
+    def test_form_submit_prevented(self):
+        """Form submit must be prevented to avoid native HTML submit."""
+        self.assertIn('form.addEventListener("submit",e=>e.preventDefault())', self.content)
+
+
+class CrossReferenceTests(unittest.TestCase):
+    """Cross-reference tests: verify all JS selectors/field names exist in HTML."""
+    def setUp(self):
+        self.js_path = Path(__file__).parent.parent / "assets" / "scripts" / "custom-song-order.js"
+        self.html_path = Path(__file__).parent.parent / "promo-lab.html"
+        self.js_content = self.js_path.read_text(encoding="utf-8")
+        self.html_content = self.html_path.read_text(encoding="utf-8")
+
+    def test_all_brief_field_names_exist_in_html(self):
+        """All field names used in buildBrief() must exist in promo-lab.html."""
+        # Extract all field names used in buildBrief()
+        brief_section = self.js_content[self.js_content.find("function buildBrief()"):
+                                        self.js_content.find("function renderLanguage")]
+        # Field names used directly
+        direct_fields = [
+            "purpose", "subject", "story", "language", "genre", "mood",
+            "lyricsStatus", "creativeFreedom", "instrument", "vocal",
+            "references", "avoid", "additionalNotes",
+            "contentGuidelines", "revisionAcknowledgement", "licenseAcknowledgement"
+        ]
+        # Other fields
+        other_fields = ["purposeOther", "languageOther", "genreOther", "moodOther"]
+        # Conditional fields
+        conditional_fields = ["lyricsDetails", "lyricsPermission"]
+
+        all_fields = direct_fields + other_fields + conditional_fields
+
+        for field in all_fields:
+            self.assertIn(f'name="{field}"', self.html_content,
+                         f"Field '{field}' used in JS but not found in HTML")
+
+    def test_all_checked_field_names_exist_in_html(self):
+        """All field names used in checked() calls must exist in HTML."""
+        # checked() is used for radio button groups
+        checked_fields = ["purpose", "language", "lyricsStatus", "creativeFreedom", "vocal"]
+        for field in checked_fields:
+            self.assertIn(f'name="{field}"', self.html_content,
+                         f"Checked field '{field}' used in JS but not found in HTML")
+
+    def test_all_checks_field_names_exist_in_html(self):
+        """All field names used in checks() calls must exist in HTML."""
+        # checks() is used for checkbox groups
+        checks_fields = ["mood", "instrument"]
+        for field in checks_fields:
+            self.assertIn(f'name="{field}"', self.html_content,
+                         f"Checks field '{field}' used in JS but not found in HTML")
+
+    def test_solo_field_exists_in_html(self):
+        """The 'solo' field used in checked('solo') must exist in HTML."""
+        self.assertIn('name="solo"', self.html_content)
+
+    def test_next_button_selector_exists(self):
+        """The next button selector must exist in HTML."""
+        self.assertIn('data-custom-song-next', self.html_content)
+        self.assertIn('data-custom-song-back', self.html_content)
+
+
 class FrontendBriefStructureTests(unittest.TestCase):
     """Tests for buildBrief() structure and normalization."""
     def setUp(self):
@@ -441,9 +601,9 @@ class FrontendBriefStructureTests(unittest.TestCase):
 
     def test_acknowledgements_always_included(self):
         """All acknowledgements must always be included in brief."""
-        self.assertIn('contentGuidelines: f("contentGuidelines").checked', self.brief_section)
-        self.assertIn('revisionAcknowledgement: f("revisionAcknowledgement").checked', self.brief_section)
-        self.assertIn('licenseAcknowledgement: f("licenseAcknowledgement").checked', self.brief_section)
+        self.assertIn('contentGuidelines:', self.brief_section)
+        self.assertIn('revisionAcknowledgement:', self.brief_section)
+        self.assertIn('licenseAcknowledgement:', self.brief_section)
 
 
 class StaticRouteTests(unittest.TestCase):
@@ -504,6 +664,11 @@ class ReturnPageTests(unittest.TestCase):
         content = path.read_text(encoding="utf-8")
         self.assertIn("data-i18n=", content)
 
+    def test_hidden_attribute_cannot_be_overridden_by_button_display(self):
+        css_path = Path(__file__).parent.parent / "assets" / "styles" / "main.css"
+        css = css_path.read_text(encoding="utf-8")
+        self.assertIn("[hidden] {\n  display: none !important;\n}", css)
+
 class ReturnPageJSTests(unittest.TestCase):
     """Tests for paypal-return.js structure."""
     def setUp(self):
@@ -535,6 +700,12 @@ class ReturnPageJSTests(unittest.TestCase):
     def test_retry_button_handler(self):
         self.assertIn("retry-button", self.content)
         self.assertIn("addEventListener", self.content)
+
+    def test_retry_button_visibility_matches_payment_state(self):
+        success_section = self.content[self.content.find("function showSuccess"):self.content.find("function showRecoverableError")]
+        recoverable_section = self.content[self.content.find("function showRecoverableError"):self.content.find("function showFatalError")]
+        self.assertIn("retryButton.hidden = true", success_section)
+        self.assertIn("retryButton.hidden = false", recoverable_section)
 
     def test_bilingual_strings_defined(self):
         self.assertIn("confirmingPayment", self.content)

@@ -38,6 +38,9 @@ class PayPalAmbiguousResultError(PayPalClientError):
 class PayPalClient:
     """Encapsulates OAuth and Orders v2 requests without pricing knowledge."""
 
+    # Loopback hostnames permitted for HTTP in sandbox environment
+    _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
     def __init__(self, config: PayPalConfig, timeout_seconds: float = 15.0):
         if not config.client_id or not config.client_secret:
             raise PayPalConfigurationError("PayPal credentials are not configured.")
@@ -118,18 +121,40 @@ class PayPalClient:
             raise PayPalClientError("Unsupported currency.")
         return currency
 
-    @staticmethod
-    def _validate_checkout_url(url: str, field_name: str) -> str:
+    def _validate_checkout_url(self, url: str, field_name: str) -> str:
         if not isinstance(url, str):
             raise PayPalClientError(f"Invalid {field_name}.")
         try:
             parsed = urlsplit(url)
-            valid = parsed.scheme == "https" and parsed.hostname and not parsed.username and not parsed.password
+            hostname = parsed.hostname or ""
+            # Accessing port forces urllib to reject non-numeric and out-of-range ports.
+            parsed.port
+
+            # Always require: hostname present, no embedded credentials
+            if not hostname or parsed.username is not None or parsed.password is not None:
+                raise PayPalClientError(f"Invalid {field_name}.")
+
+            # For live: HTTPS is mandatory
+            if self._config.environment == "live":
+                if parsed.scheme != "https":
+                    raise PayPalClientError(f"Invalid {field_name}.")
+
+            # For sandbox: HTTPS always allowed; HTTP allowed only for loopback hosts
+            else:  # sandbox
+                if parsed.scheme == "https":
+                    # HTTPS is always valid
+                    pass
+                elif parsed.scheme == "http":
+                    # HTTP only allowed for loopback hosts
+                    if hostname not in self._LOOPBACK_HOSTS:
+                        raise PayPalClientError(f"Invalid {field_name}.")
+                else:
+                    # Any other scheme (ftp, file, etc.) is invalid
+                    raise PayPalClientError(f"Invalid {field_name}.")
+
+            return url
         except ValueError:
-            valid = False
-        if not valid:
             raise PayPalClientError(f"Invalid {field_name}.")
-        return url
 
     def _extract_approval_url(self, response: dict[str, Any]) -> str:
         links = response.get("links")

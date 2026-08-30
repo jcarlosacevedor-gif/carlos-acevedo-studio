@@ -131,7 +131,6 @@
   // UI UPDATES
   // ============================================================================
   function setLoading() {
-    isConfirming = true;
     if (retryButton) retryButton.disabled = true;
     if (statusHeading) statusHeading.textContent = t("confirmingPayment");
     if (statusMessage) statusMessage.textContent = "";
@@ -193,6 +192,7 @@
   // ============================================================================
   async function confirmPayment() {
     if (isConfirming) return;
+    isConfirming = true;
 
     const token = getToken();
 

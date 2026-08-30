@@ -53,6 +53,10 @@
   --container-width: 1280px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 *,
 *::before,
 *::after {

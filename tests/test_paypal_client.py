@@ -313,3 +313,124 @@ class PayPalClientTests(unittest.TestCase):
         with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(order_response)]):
             with self.assertRaises(PayPalResponseError):
                 self.client.show_order("ORDER123")
+
+    # Tests for _validate_checkout_url with HTTP/HTTPS and sandbox/live environments
+    def test_sandbox_allows_https_urls(self):
+        """Sandbox environment must allow HTTPS URLs on any valid hostname."""
+        self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+        self.assertEqual(self.client._validate_checkout_url("https://example.com/return", "return URL"), "https://example.com/return")
+        self.assertEqual(self.client._validate_checkout_url("https://paypal.example.com/cancel", "cancel URL"), "https://paypal.example.com/cancel")
+
+    def test_sandbox_allows_http_for_loopback_hosts(self):
+        """Sandbox environment must allow HTTP for loopback hosts."""
+        self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+        # 127.0.0.1
+        self.assertEqual(self.client._validate_checkout_url("http://127.0.0.1:8000/paypal/return", "return URL"), "http://127.0.0.1:8000/paypal/return")
+        # localhost
+        self.assertEqual(self.client._validate_checkout_url("http://localhost:8000/paypal/return", "return URL"), "http://localhost:8000/paypal/return")
+        # IPv6 loopback
+        self.assertEqual(self.client._validate_checkout_url("http://[::1]:8000/paypal/return", "return URL"), "http://[::1]:8000/paypal/return")
+
+    def test_sandbox_rejects_http_for_non_loopback_hosts(self):
+        """Sandbox environment must reject HTTP for non-loopback hosts."""
+        self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("http://example.com/return", "return URL")
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("http://paypal.example.com/cancel", "cancel URL")
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("http://localhost.evil.com/return", "return URL")
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("http://127.0.0.1.evil.com/return", "return URL")
+
+    def test_live_requires_https_only(self):
+        """Live environment must require HTTPS for all hosts."""
+        self.client = PayPalClient(PayPalConfig("live", CLIENT_ID, CLIENT_SECRET))
+        # HTTPS always allowed
+        self.assertEqual(self.client._validate_checkout_url("https://example.com/return", "return URL"), "https://example.com/return")
+        self.assertEqual(self.client._validate_checkout_url("https://127.0.0.1:8000/paypal/return", "return URL"), "https://127.0.0.1:8000/paypal/return")
+        # HTTP always rejected for live
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("http://example.com/return", "return URL")
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("http://127.0.0.1:8000/return", "return URL")
+
+    def test_validate_checkout_url_rejects_non_http_schemes(self):
+        """Any non-http(s) scheme must be rejected in both environments."""
+        for scheme in ["ftp", "file", "mailto", "javascript"]:
+            with self.subTest(scheme=scheme):
+                self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+                with self.assertRaises(PayPalClientError):
+                    self.client._validate_checkout_url(f"{scheme}://example.com/return", "return URL")
+
+    def test_validate_checkout_url_rejects_missing_hostname(self):
+        """URLs without hostname must be rejected."""
+        self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("http:///return", "return URL")
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url("https:///return", "return URL")
+
+    def test_validate_checkout_url_rejects_embedded_credentials(self):
+        """URLs with embedded username/password must be rejected."""
+        self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+        for url in (
+            "http://@127.0.0.1:8000/paypal/return",
+            "http://user@127.0.0.1:8000/paypal/return",
+            "http://user:@127.0.0.1:8000/paypal/return",
+            "http://:pass@127.0.0.1:8000/paypal/return",
+            "http://:@127.0.0.1:8000/paypal/return",
+            "https://@example.com/return",
+            "https://user:pass@example.com/return",
+        ):
+            with self.subTest(url=url):
+                with self.assertRaises(PayPalClientError):
+                    self.client._validate_checkout_url(url, "return URL")
+
+    def test_validate_checkout_url_rejects_invalid_port(self):
+        self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+        for url in ("http://127.0.0.1:not-a-port/paypal/return", "http://127.0.0.1:65536/paypal/return"):
+            with self.subTest(url=url):
+                with self.assertRaises(PayPalClientError):
+                    self.client._validate_checkout_url(url, "return URL")
+
+    def test_validate_checkout_url_rejects_non_string(self):
+        """Non-string URLs must be rejected."""
+        self.client = PayPalClient(PayPalConfig("sandbox", CLIENT_ID, CLIENT_SECRET))
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url(None, "return URL")
+        with self.assertRaises(PayPalClientError):
+            self.client._validate_checkout_url(123, "return URL")
+
+    def test_create_order_validates_urls_before_oauth(self):
+        """URL validation must happen before OAuth/access token is requested."""
+        # Patch _get_access_token to track if it's called
+        original_get_access_token = self.client._get_access_token
+        access_token_called = []
+
+        def track_get_access_token():
+            access_token_called.append(True)
+            return original_get_access_token()
+
+        self.client._get_access_token = track_get_access_token
+
+        # Test with invalid HTTP URL for non-loopback in sandbox
+        # This should fail validation before OAuth is called
+        access_token_called.clear()
+        with self.assertRaises(PayPalClientError):
+            self.client.create_order(19_900, "USD", "test-req",
+                                       return_url="http://example.com/return",
+                                       cancel_url="http://example.com/cancel")
+        self.assertEqual(len(access_token_called), 0,
+                        "OAuth should NOT be called when URL validation fails")
+
+    def test_create_order_rejects_embedded_credentials_before_oauth_or_create(self):
+        for url in ("http://@127.0.0.1:8000/paypal/return", "https://user@example.com/return"):
+            with self.subTest(url=url):
+                with patch("backend.paypal_client.urlopen") as mocked_open:
+                    with self.assertRaises(PayPalClientError):
+                        self.client.create_order(
+                            19_900, "USD", "embedded-credentials", return_url=url,
+                            cancel_url="http://127.0.0.1:8000/paypal/cancel",
+                        )
+                mocked_open.assert_not_called()
