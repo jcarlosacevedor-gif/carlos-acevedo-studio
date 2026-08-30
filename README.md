@@ -68,6 +68,16 @@ python -m backend.paypal_sandbox_smoke capture <ORDER_ID> --solo guitar-solo
 
 El backend usa SQLite durable para persistencia de órdenes Custom Song; su archivo de desarrollo vive fuera de Git bajo `instance/`. Los endpoints Flask para Create y Capture ya están implementados y son pruebas automatizadas. El smoke runner Sandbox sigue siendo una herramienta separada para pruebas manuales.
 
+## Backup SQLite local (Sandbox)
+
+La primera herramienta de backup es local/test y solo acepta `sandbox`; no llama a PayPal ni opera Render. Requiere una DB existente y un directorio de destino distinto al de la DB:
+
+```bash
+python -m backend.sqlite_backup create --environment sandbox --source-db C:\ruta\temporal\orders.sqlite3 --destination-directory C:\ruta\temporal\backups
+```
+
+Genera una copia SQLite y un manifiesto JSON con checksum SHA-256. No es una herramienta de restore ni un mecanismo de almacenamiento externo.
+
 El endpoint `GET /api/paypal/orders/resolve?token=<paypal_order_id>` permite correlacionar un PayPal Order ID con el `local_order_id` local. Este endpoint solo realiza lookup en SQLite y no modifica estados ni consulta PayPal. **El token recibido del navegador NO es autoridad**: se valida sintácticamente, debe existir como `paypal_order_id` persistido en SQLite, y solo sirve para correlación. La verificación definitiva de pago ocurre durante Capture. La correlación server-side permite al frontend obtener el identificador local necesario para llamar al endpoint Capture.
 
 El frontend todavía no está conectado al backend en esta iteración. La integración de return/cancel pages se realizará en una iteración posterior.
