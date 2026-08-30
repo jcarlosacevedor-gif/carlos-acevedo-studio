@@ -3,3 +3,15 @@
   to = "https://carlos-acevedo-studio-backend-preview.onrender.com/api/:splat"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/paypal/return"
+  to = "/paypal-return.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/paypal/cancel"
+  to = "/paypal-cancel.html"
+  status = 200
+  force = true

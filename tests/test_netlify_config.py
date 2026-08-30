@@ -7,6 +7,26 @@ from urllib.parse import urlsplit
 PROJECT_ROOT = Path(__file__).parent.parent
 NETLIFY_CONFIG = PROJECT_ROOT / "netlify.toml"
 RENDER_API_ORIGIN = "https://carlos-acevedo-studio-backend-preview.onrender.com"
+EXPECTED_REDIRECTS = [
+    {
+        "from": "/api/*",
+        "to": f"{RENDER_API_ORIGIN}/api/:splat",
+        "status": 200,
+        "force": True,
+    },
+    {
+        "from": "/paypal/return",
+        "to": "/paypal-return.html",
+        "status": 200,
+        "force": True,
+    },
+    {
+        "from": "/paypal/cancel",
+        "to": "/paypal-cancel.html",
+        "status": 200,
+        "force": True,
+    },
+]
 
 
 class NetlifyProxyConfigurationTests(unittest.TestCase):
@@ -15,22 +35,26 @@ class NetlifyProxyConfigurationTests(unittest.TestCase):
         self.config = tomllib.loads(self.raw_config)
         self.redirects = self.config.get("redirects", [])
 
-    def test_config_exists_and_has_exactly_one_api_proxy_rule(self):
+    def test_config_has_exactly_the_expected_proxy_and_static_rules(self):
         self.assertTrue(NETLIFY_CONFIG.is_file())
-        self.assertEqual(len(self.redirects), 1)
-        self.assertEqual(self.redirects[0]["from"], "/api/*")
-        self.assertEqual(
-            self.redirects[0]["to"],
-            f"{RENDER_API_ORIGIN}/api/:splat",
-        )
-        self.assertEqual(self.redirects[0]["status"], 200)
-        self.assertIs(self.redirects[0]["force"], True)
+        self.assertEqual(self.redirects, EXPECTED_REDIRECTS)
 
-    def test_proxy_does_not_cover_static_or_paypal_return_routes(self):
-        proxied_paths = [rule["from"] for rule in self.redirects]
-        self.assertEqual(proxied_paths, ["/api/*"])
-        for path in ("/paypal/return", "/paypal/cancel", "/assets/*", "/*", "/health"):
-            self.assertNotIn(path, proxied_paths)
+    def test_paypal_return_and_cancel_are_local_static_rewrites(self):
+        static_rules = self.redirects[1:]
+        self.assertEqual(
+            [(rule["from"], rule["to"], rule["status"]) for rule in static_rules],
+            [
+                ("/paypal/return", "/paypal-return.html", 200),
+                ("/paypal/cancel", "/paypal-cancel.html", 200),
+            ],
+        )
+        self.assertTrue(all(rule["force"] is True for rule in static_rules))
+        self.assertTrue(all(not rule["to"].startswith(RENDER_API_ORIGIN) for rule in static_rules))
+
+    def test_api_is_the_only_rule_targeting_render(self):
+        render_rules = [rule for rule in self.redirects if rule["to"].startswith(RENDER_API_ORIGIN)]
+        self.assertEqual(render_rules, [EXPECTED_REDIRECTS[0]])
+        self.assertNotIn("/health", [rule["from"] for rule in self.redirects])
 
     def test_proxy_target_is_https_and_has_no_embedded_credentials_or_query(self):
         target = self.redirects[0]["to"]
