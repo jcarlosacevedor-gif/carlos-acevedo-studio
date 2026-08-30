@@ -10,6 +10,35 @@ class ConfigurationError(ValueError):
     """Raised when a required, safe configuration value is unavailable."""
 
 
+@dataclass(frozen=True)
+class NetlifyProxyAuthConfig:
+    secret: str
+    site_id: str
+    site_url: str
+    deploy_context: str
+
+
+def get_netlify_proxy_auth_config() -> NetlifyProxyAuthConfig | None:
+    """Return complete proxy auth config, or None only for unprotected Sandbox/local."""
+    names = (
+        "NETLIFY_PROXY_SIGNING_SECRET",
+        "NETLIFY_PROXY_EXPECTED_SITE_ID",
+        "NETLIFY_PROXY_EXPECTED_SITE_URL",
+        "NETLIFY_PROXY_EXPECTED_DEPLOY_CONTEXT",
+    )
+    values = {name: os.environ.get(name, "").strip() for name in names}
+    environment = os.environ.get("PAYPAL_ENVIRONMENT", "sandbox").strip().lower()
+    if environment not in PAYPAL_API_BASE_URLS:
+        raise ConfigurationError("PAYPAL_ENVIRONMENT must be 'sandbox' or 'live'.")
+    if not any(values.values()):
+        if environment == "live":
+            raise ConfigurationError("Live requires complete Netlify proxy authorization configuration.")
+        return None
+    if not all(values.values()):
+        raise ConfigurationError("Netlify proxy authorization configuration must be complete.")
+    return NetlifyProxyAuthConfig(values[names[0]], values[names[1]], values[names[2]], values[names[3]])
+
+
 PAYPAL_API_BASE_URLS = {
     "sandbox": "https://api-m.sandbox.paypal.com",
     "live": "https://api-m.paypal.com",

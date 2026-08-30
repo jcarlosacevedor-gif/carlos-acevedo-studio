@@ -6,7 +6,8 @@ import re
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import BadRequest, HTTPException
 
-from .config import ConfigurationError, PayPalConfig, get_order_db_path, get_public_site_base_url
+from .config import ConfigurationError, PayPalConfig, get_netlify_proxy_auth_config, get_order_db_path, get_public_site_base_url
+import jwt
 from .pricing import PricingError, calculate_custom_song_price
 from .order_store import OrderStore
 from .order_service import OrderService, OrderServiceError
@@ -59,6 +60,7 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
     """Create the local same-origin server without contacting PayPal."""
     app = Flask(__name__, static_folder=str(PROJECT_ROOT), static_url_path="")
     app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
+    proxy_auth = get_netlify_proxy_auth_config()
     def service_for_request():
         if order_service is not None:
             return order_service
@@ -78,6 +80,21 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
         if request.path.startswith("/api/"):
             return jsonify({"error": error.description}), error.code
         return error
+
+    @app.before_request
+    def require_netlify_proxy_signature():
+        if proxy_auth is None or not request.path.startswith("/api/paypal/"):
+            return None
+        signature = request.headers.get("x-nf-sign")
+        if not signature:
+            return jsonify({"error": "Proxy authorization required."}), 403
+        try:
+            claims = jwt.decode(signature, proxy_auth.secret, algorithms=["HS256"], issuer="netlify", options={"require": ["exp", "iss", "deploy_context", "netlify_id", "site_url"]})
+        except jwt.PyJWTError:
+            return jsonify({"error": "Proxy authorization required."}), 403
+        if (claims.get("deploy_context") != proxy_auth.deploy_context or claims.get("netlify_id") != proxy_auth.site_id or claims.get("site_url") != proxy_auth.site_url):
+            return jsonify({"error": "Proxy authorization required."}), 403
+        return None
 
     @app.get("/")
     def home_page():
