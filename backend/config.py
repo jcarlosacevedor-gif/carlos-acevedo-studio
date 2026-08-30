@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 
@@ -20,6 +21,8 @@ PAYPAL_APPROVAL_HOSTS = {
 
 # Protocol constants used across PayPal client and order persistence layers
 REQUEST_ID_MAX_LENGTH = 108
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_ORDER_DB_PATH = PROJECT_ROOT / "instance" / "orders.sqlite3"
 
 
 def _validate_base_url(value: str) -> str:
@@ -40,6 +43,16 @@ def _validate_base_url(value: str) -> str:
 def get_public_site_base_url() -> str:
     """Get the configured public site base URL, validated."""
     return _validate_base_url(os.environ.get("PUBLIC_SITE_BASE_URL", "http://127.0.0.1:8000"))
+
+
+def get_order_db_path() -> Path:
+    """Return the configured SQLite path or preserve the historic local default."""
+    value = os.environ.get("ORDER_DB_PATH")
+    if value is None:
+        return DEFAULT_ORDER_DB_PATH
+    if not value.strip():
+        raise ConfigurationError("ORDER_DB_PATH must be omitted or a non-empty path.")
+    return Path(value)
 
 
 @dataclass(frozen=True)

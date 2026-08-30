@@ -36,6 +36,16 @@ Para ejecutar el servidor local Flask (que también puede servir los archivos es
 python -m backend.app
 ```
 
+## Preparación para hosting del backend
+
+Para un host WSGI Linux, el entrypoint es `backend.app:app`. El comando de producción previsto es:
+
+```bash
+gunicorn --workers 1 --bind 0.0.0.0:$PORT backend.app:app
+```
+
+`ORDER_DB_PATH` es opcional. Si se omite, el desarrollo local conserva `instance/orders.sqlite3`. Para una primera instancia de producción con SQLite, configúrala como una ruta del volumen persistente (por ejemplo, `/var/data/orders.sqlite3`) y usa un solo worker. El endpoint de proceso `GET /health` devuelve `{"status":"ok"}` y no consulta PayPal ni SQLite; una readiness que compruebe dependencias queda pendiente.
+
 ## Smoke tests manuales de PayPal Sandbox
 
 Estas herramientas son exclusivamente de desarrollo para PayPal Sandbox; no son un flujo de producción. Nunca copies credenciales al repositorio ni compartas el Client Secret.
