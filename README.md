@@ -48,6 +48,8 @@ gunicorn --workers 1 --bind 0.0.0.0:$PORT backend.app:app
 
 `ORDER_DB_PATH` es opcional. Si se omite, el desarrollo local conserva `instance/orders.sqlite3`. Para una primera instancia de producción con SQLite, configúrala como una ruta del volumen persistente (por ejemplo, `/var/data/orders.sqlite3`) y usa un solo worker. El endpoint de proceso `GET /health` devuelve `{"status":"ok"}` y no consulta PayPal ni SQLite; una readiness que compruebe dependencias queda pendiente.
 
+Netlify permanece como frontend. En la rama de staging `deploy/render-preview`, `netlify.toml` proxyea únicamente `/api/*` al backend Render para conservar fetch same-origin; `/paypal/return` y `/paypal/cancel` siguen siendo paginas estaticas del frontend. Antes de crear ordenes desde el Branch Deploy, configura `PUBLIC_SITE_BASE_URL` en Render con el origin HTTPS exacto que Netlify asigne a esa rama.
+
 ## Smoke tests manuales de PayPal Sandbox
 
 Estas herramientas son exclusivamente de desarrollo para PayPal Sandbox; no son un flujo de producción. Nunca copies credenciales al repositorio ni compartas el Client Secret.
