@@ -126,6 +126,87 @@ def _validate_backup(path: Path) -> dict[str, Any]:
     }
 
 
+def _require_sandbox(environment: str) -> None:
+    if environment != "sandbox":
+        raise SQLiteBackupError("Only environment=sandbox is permitted.")
+
+
+def _reject_operational_path(value: str | Path) -> Path:
+    raw = str(value).replace("\\", "/").lower()
+    if raw.startswith("/var/data") or "/live/" in f"/{raw.strip('/')}/":
+        raise SQLiteBackupError("Operational or Live paths are not permitted.")
+    return Path(value).expanduser().resolve(strict=False)
+
+
+def verify_backup(*, backup_path: str | Path, manifest_path: str | Path, environment: str) -> dict[str, Any]:
+    """Verify an existing Sandbox backup without writing to it or its source DB."""
+    _require_sandbox(environment)
+    backup = _reject_operational_path(backup_path)
+    manifest_file = _reject_operational_path(manifest_path)
+    if not backup.is_file() or not manifest_file.is_file():
+        raise SQLiteBackupError("Backup and manifest must both exist as regular files.")
+    try:
+        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SQLiteBackupError("Manifest could not be read as JSON.") from error
+    required = {"environment", "sha256", "backup_filename", "custom_song_orders_count", "pragma_user_version"}
+    if not isinstance(manifest, dict) or not required.issubset(manifest):
+        raise SQLiteBackupError("Manifest is incomplete.")
+    if manifest["environment"] != "sandbox" or manifest["backup_filename"] != backup.name:
+        raise SQLiteBackupError("Backup and manifest environment or filename do not match.")
+    if manifest["sha256"] != _sha256(backup):
+        raise SQLiteBackupError("Backup checksum does not match the manifest.")
+    if "backup_size_bytes" in manifest and manifest["backup_size_bytes"] != backup.stat().st_size:
+        raise SQLiteBackupError("Backup size does not match the manifest.")
+    details = _validate_backup(backup)
+    if details["custom_song_orders_count"] != manifest["custom_song_orders_count"]:
+        raise SQLiteBackupError("Backup row count does not match the manifest.")
+    if details["pragma_user_version"] != manifest["pragma_user_version"]:
+        raise SQLiteBackupError("Backup user version does not match the manifest.")
+    return details
+
+
+def restore_drill(*, backup_path: str | Path, manifest_path: str | Path, destination_db: str | Path, environment: str) -> Path:
+    """Create a verified, isolated Sandbox copy. It never replaces a database."""
+    verify_backup(backup_path=backup_path, manifest_path=manifest_path, environment=environment)
+    backup = _reject_operational_path(backup_path)
+    destination = _reject_operational_path(destination_db)
+    if destination.exists() or destination == backup:
+        raise SQLiteBackupError("Restore-drill destination must be a new, distinct database path.")
+    if not destination.parent.is_dir():
+        raise SQLiteBackupError("Restore-drill destination directory must exist.")
+    temporary: Path | None = None
+    published: os.stat_result | None = None
+    try:
+        temporary = _new_temporary_path(destination.parent, ".restore-drill.tmp")
+        source = sqlite3.connect(backup.as_uri() + "?mode=ro", uri=True)
+        try:
+            target = sqlite3.connect(temporary)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+        finally:
+            source.close()
+        details = _validate_backup(temporary)
+        manifest_details = verify_backup(backup_path=backup, manifest_path=manifest_path, environment=environment)
+        if details["custom_song_orders_count"] != manifest_details["custom_song_orders_count"] or details["pragma_user_version"] != manifest_details["pragma_user_version"]:
+            raise SQLiteBackupError("Restore-drill validation did not match the verified backup.")
+        published = _publish_without_overwrite(temporary, destination)
+        return destination
+    except (OSError, sqlite3.Error) as error:
+        raise SQLiteBackupError("Could not create the isolated restore drill.") from error
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+        # A return only happens after publication; failures never intentionally retain a destination.
+        if published is not None and not destination.exists():
+            _unlink_owned(destination, published)
+
+
 def create_backup(*, source_db_path: str | Path, destination_directory: str | Path, environment: str) -> tuple[Path, Path]:
     """Create and validate a local Sandbox backup, then atomically publish it."""
     if environment != "sandbox":
@@ -201,20 +282,32 @@ def main(argv: list[str] | None = None, *, stdout=None, stderr=None) -> int:
     create_parser.add_argument("--source-db", required=True)
     create_parser.add_argument("--destination-directory", required=True)
     create_parser.add_argument("--environment", required=True)
+    verify_parser = commands.add_parser("verify")
+    verify_parser.add_argument("--backup-db", required=True)
+    verify_parser.add_argument("--manifest", required=True)
+    verify_parser.add_argument("--environment", required=True)
+    drill_parser = commands.add_parser("restore-drill")
+    drill_parser.add_argument("--backup-db", required=True)
+    drill_parser.add_argument("--manifest", required=True)
+    drill_parser.add_argument("--destination-db", required=True)
+    drill_parser.add_argument("--environment", required=True)
     args = parser.parse_args(argv)
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
     try:
-        backup_path, manifest_path = create_backup(
-            source_db_path=args.source_db,
-            destination_directory=args.destination_directory,
-            environment=args.environment,
-        )
+        if args.command == "create":
+            backup_path, manifest_path = create_backup(source_db_path=args.source_db, destination_directory=args.destination_directory, environment=args.environment)
+            print(f"SQLite Sandbox backup created: {backup_path.name}", file=stdout)
+            print(f"Manifest created: {manifest_path.name}", file=stdout)
+        elif args.command == "verify":
+            verify_backup(backup_path=args.backup_db, manifest_path=args.manifest, environment=args.environment)
+            print("SQLite Sandbox backup verification: OK", file=stdout)
+        else:
+            destination = restore_drill(backup_path=args.backup_db, manifest_path=args.manifest, destination_db=args.destination_db, environment=args.environment)
+            print(f"SQLite Sandbox restore drill created: {destination.name}", file=stdout)
     except SQLiteBackupError as error:
         print(f"SQLite Sandbox backup failed: {error}", file=stderr)
         return 1
-    print(f"SQLite Sandbox backup created: {backup_path.name}", file=stdout)
-    print(f"Manifest created: {manifest_path.name}", file=stdout)
     return 0
 
 

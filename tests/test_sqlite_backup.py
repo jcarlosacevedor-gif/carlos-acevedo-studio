@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path, PureWindowsPath
 from unittest.mock import Mock, patch
 
-from backend.sqlite_backup import SQLiteBackupError, _publish_without_overwrite, create_backup, main
+from backend.sqlite_backup import SQLiteBackupError, _publish_without_overwrite, create_backup, main, restore_drill, verify_backup
 
 
 class SQLiteBackupTests(unittest.TestCase):
@@ -179,3 +179,102 @@ class SQLiteBackupTests(unittest.TestCase):
         )
         self.assertEqual(code, 1)
         self.assertIn("only environment=sandbox", stderr.getvalue().lower())
+
+    def test_verify_succeeds_without_modifying_backup_and_rejects_mismatches(self):
+        backup, manifest = create_backup(source_db_path=self.source, destination_directory=self.destination, environment="sandbox")
+        original = backup.read_bytes()
+        self.assertEqual(verify_backup(backup_path=backup, manifest_path=manifest, environment="sandbox")["custom_song_orders_count"], 2)
+        self.assertEqual(backup.read_bytes(), original)
+        data = json.loads(manifest.read_text())
+        data["environment"] = "live"
+        manifest.write_text(json.dumps(data))
+        with self.assertRaises(SQLiteBackupError):
+            verify_backup(backup_path=backup, manifest_path=manifest, environment="sandbox")
+
+    def test_verify_rejects_checksum_corruption_missing_table_and_bad_count(self):
+        backup, manifest = create_backup(source_db_path=self.source, destination_directory=self.destination, environment="sandbox")
+        backup.write_bytes(b"corrupt")
+        with self.assertRaises(SQLiteBackupError):
+            verify_backup(backup_path=backup, manifest_path=manifest, environment="sandbox")
+        replacement = self.destination / "empty.sqlite3"
+        sqlite3.connect(replacement).close()
+        data = json.loads(manifest.read_text())
+        data.update({"backup_filename": replacement.name, "sha256": hashlib.sha256(replacement.read_bytes()).hexdigest(), "backup_size_bytes": replacement.stat().st_size})
+        manifest.write_text(json.dumps(data))
+        with self.assertRaises(SQLiteBackupError):
+            verify_backup(backup_path=replacement, manifest_path=manifest, environment="sandbox")
+
+    def test_restore_drill_is_new_isolated_and_preserves_backup(self):
+        backup, manifest = create_backup(source_db_path=self.source, destination_directory=self.destination, environment="sandbox")
+        original = backup.read_bytes()
+        destination = self.root / "drill with spaces" / "restored.sqlite3"
+        destination.parent.mkdir()
+        result = restore_drill(backup_path=backup, manifest_path=manifest, destination_db=destination, environment="sandbox")
+        self.assertEqual(result, destination.resolve())
+        self.assertEqual(backup.read_bytes(), original)
+        restored = sqlite3.connect(result)
+        try:
+            self.assertEqual(restored.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(restored.execute("SELECT COUNT(*) FROM custom_song_orders").fetchone()[0], 2)
+        finally:
+            restored.close()
+        with self.assertRaises(SQLiteBackupError):
+            restore_drill(backup_path=backup, manifest_path=manifest, destination_db=destination, environment="sandbox")
+
+    def test_verify_rejects_invalid_incomplete_and_wrong_type_manifests_safely(self):
+        backup, manifest = create_backup(source_db_path=self.source, destination_directory=self.destination, environment="sandbox")
+        original_backup = backup.read_bytes()
+        for content in ("{not json", json.dumps({"environment": "sandbox"}), json.dumps({
+            "environment": "sandbox", "sha256": hashlib.sha256(original_backup).hexdigest(),
+            "backup_filename": backup.name, "backup_size_bytes": "wrong", "custom_song_orders_count": "2", "pragma_user_version": "0",
+        })):
+            with self.subTest(content=content):
+                manifest.write_text(content)
+                with self.assertRaises(SQLiteBackupError):
+                    verify_backup(backup_path=backup, manifest_path=manifest, environment="sandbox")
+                self.assertEqual(backup.read_bytes(), original_backup)
+                self.assertEqual(sorted(path.name for path in self.destination.iterdir()), sorted([backup.name, manifest.name]))
+
+    def test_verify_rejects_manifest_count_and_user_version_mismatches(self):
+        backup, manifest = create_backup(source_db_path=self.source, destination_directory=self.destination, environment="sandbox")
+        data = json.loads(manifest.read_text())
+        for field, value in (("custom_song_orders_count", 99), ("pragma_user_version", 7)):
+            with self.subTest(field=field):
+                changed = dict(data)
+                changed[field] = value
+                manifest.write_text(json.dumps(changed))
+                with self.assertRaises(SQLiteBackupError):
+                    verify_backup(backup_path=backup, manifest_path=manifest, environment="sandbox")
+
+    def test_verify_detects_sqlite_corruption_even_with_updated_checksum(self):
+        backup, manifest = create_backup(source_db_path=self.source, destination_directory=self.destination, environment="sandbox")
+        backup.write_bytes(b"not a sqlite database")
+        data = json.loads(manifest.read_text())
+        data["sha256"] = hashlib.sha256(backup.read_bytes()).hexdigest()
+        data["backup_size_bytes"] = backup.stat().st_size
+        manifest.write_text(json.dumps(data))
+        with self.assertRaises(SQLiteBackupError):
+            verify_backup(backup_path=backup, manifest_path=manifest, environment="sandbox")
+
+    def test_restore_drill_failure_and_destination_race_leave_no_partial_file(self):
+        backup, manifest = create_backup(source_db_path=self.source, destination_directory=self.destination, environment="sandbox")
+        original = backup.read_bytes()
+        destination = self.root / "drill.sqlite3"
+        real_validate = __import__("backend.sqlite_backup", fromlist=["_validate_backup"])._validate_backup
+        with patch("backend.sqlite_backup._validate_backup", side_effect=[real_validate(backup), SQLiteBackupError("drill validation failure")]):
+            with self.assertRaises(SQLiteBackupError):
+                restore_drill(backup_path=backup, manifest_path=manifest, destination_db=destination, environment="sandbox")
+        self.assertFalse(destination.exists())
+        self.assertEqual(backup.read_bytes(), original)
+        self.assertFalse(any("restore-drill" in path.name for path in destination.parent.iterdir()))
+
+        def winner(temporary, final):
+            final.write_bytes(b"winner")
+            return _publish_without_overwrite(temporary, final)
+
+        with patch("backend.sqlite_backup._publish_without_overwrite", side_effect=winner):
+            with self.assertRaises(SQLiteBackupError):
+                restore_drill(backup_path=backup, manifest_path=manifest, destination_db=destination, environment="sandbox")
+        self.assertEqual(destination.read_bytes(), b"winner")
+        self.assertEqual(backup.read_bytes(), original)
+        self.assertFalse(any("restore-drill" in path.name for path in destination.parent.iterdir()))
