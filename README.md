@@ -38,6 +38,8 @@ python -m backend.app
 
 ## Preparación para hosting del backend
 
+El runtime Python se fija en `.python-version` con la version validada por la suite de pruebas; Render debe usar ese archivo al crear el servicio.
+
 Para un host WSGI Linux, el entrypoint es `backend.app:app`. El comando de producción previsto es:
 
 ```bash
