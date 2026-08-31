@@ -93,8 +93,20 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
             return jsonify({"error": "Proxy authorization required."}), 403
         try:
             claims = jwt.decode(signature, proxy_auth.secret, algorithms=["HS256"], issuer="netlify", options={"require": ["exp", "iss", "deploy_context", "netlify_id", "site_url"]})
+        except jwt.ExpiredSignatureError:
+            LOGGER.warning("netlify_proxy_auth_failure reason=expired_signature")
+            return jsonify({"error": "Proxy authorization required."}), 403
+        except jwt.InvalidIssuerError:
+            LOGGER.warning("netlify_proxy_auth_failure reason=invalid_issuer")
+            return jsonify({"error": "Proxy authorization required."}), 403
+        except jwt.InvalidAlgorithmError:
+            LOGGER.warning("netlify_proxy_auth_failure reason=invalid_algorithm")
+            return jsonify({"error": "Proxy authorization required."}), 403
+        except jwt.InvalidSignatureError:
+            LOGGER.warning("netlify_proxy_auth_failure reason=signature_mismatch")
+            return jsonify({"error": "Proxy authorization required."}), 403
         except jwt.PyJWTError:
-            LOGGER.warning("netlify_proxy_auth_failure reason=invalid_signature")
+            LOGGER.warning("netlify_proxy_auth_failure reason=malformed_or_invalid_token")
             return jsonify({"error": "Proxy authorization required."}), 403
         mismatched_claims = []
         if claims.get("deploy_context") != proxy_auth.deploy_context:

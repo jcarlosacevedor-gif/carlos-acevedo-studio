@@ -86,7 +86,7 @@ class NetlifyProxyAuthTests(unittest.TestCase):
     def test_failure_logs_are_sanitized_categories_before_service(self):
         cases = [
             ({}, "reason=missing_header", []),
-            ({"x-nf-sign": "malformed.jwt.value"}, "reason=invalid_signature", []),
+            ({"x-nf-sign": "malformed.jwt.value"}, "reason=malformed_or_invalid_token", []),
             ({"x-nf-sign": self.token(site_url="https://secret-claim.example")}, "reason=invalid_claim", ["site_url"]),
             ({"x-nf-sign": self.token(netlify_id="secret-site", deploy_context="secret-context")}, "reason=invalid_claim", ["netlify_id", "deploy_context"]),
         ]
@@ -102,4 +102,26 @@ class NetlifyProxyAuthTests(unittest.TestCase):
                 for name in claim_names: self.assertIn(name, output)
                 for secret in ("PAYPALORDER123", "secret-auth", "sandbox-test-secret", "https://secret-claim.example", "secret-site", "secret-context"):
                     self.assertNotIn(secret, output)
+                service.resolve_paypal_order.assert_not_called()
+
+    def test_pyjwt_failure_reasons_are_sanitized_and_specific(self):
+        claims = {"iss": "netlify", "exp": 4_000_000_000, "netlify_id": "sandbox-site", "site_url": "https://sandbox.example.test", "deploy_context": "branch-deploy"}
+        cases = [
+            (jwt.encode(claims, "other-secret", algorithm="HS256"), "signature_mismatch"),
+            (self.token(exp=1), "expired_signature"),
+            (self.token(iss="other"), "invalid_issuer"),
+            (jwt.encode(claims, AUTH["NETLIFY_PROXY_SIGNING_SECRET"], algorithm="HS384"), "invalid_algorithm"),
+            ("not.a.jwt", "malformed_or_invalid_token"),
+        ]
+        for signature, reason in cases:
+            with self.subTest(reason=reason):
+                service = Mock()
+                with patch.dict(os.environ, AUTH, clear=True), self.assertLogs("backend.app", level="WARNING") as logs:
+                    response = create_app(order_service=service).test_client().get("/api/paypal/orders/resolve?token=PAYPALORDER123", headers={"x-nf-sign": signature, "Authorization": "secret-auth"})
+                output = "\n".join(logs.output)
+                self.assertIn(f"reason={reason}", output)
+                self.assertEqual(response.json, {"error": "Proxy authorization required."})
+                self.assertNotIn("PAYPALORDER123", output)
+                self.assertNotIn("secret-auth", output)
+                self.assertNotIn("sandbox-test-secret", output)
                 service.resolve_paypal_order.assert_not_called()
