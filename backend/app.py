@@ -1,7 +1,6 @@
 """Flask placeholder API for the future PayPal integration."""
 
 from pathlib import Path
-import logging
 import re
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -16,7 +15,6 @@ from .paypal_client import PayPalClient, PayPalClientError, validate_order_id
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-LOGGER = logging.getLogger(__name__)
 
 # For Capture endpoint: reject any attempt to supply business fields from the browser.
 CAPTURE_FORBIDDEN_FIELDS = frozenset({
@@ -89,36 +87,16 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
             return None
         signature = request.headers.get("x-nf-sign")
         if not signature:
-            LOGGER.warning("netlify_proxy_auth_failure reason=missing_header")
             return jsonify({"error": "Proxy authorization required."}), 403
         try:
             claims = jwt.decode(signature, proxy_auth.secret, algorithms=["HS256"], issuer="netlify", options={"require": ["exp", "iss", "deploy_context", "netlify_id", "site_url"]})
-        except jwt.ExpiredSignatureError:
-            LOGGER.warning("netlify_proxy_auth_failure reason=expired_signature")
-            return jsonify({"error": "Proxy authorization required."}), 403
-        except jwt.InvalidIssuerError:
-            LOGGER.warning("netlify_proxy_auth_failure reason=invalid_issuer")
-            return jsonify({"error": "Proxy authorization required."}), 403
-        except jwt.InvalidAlgorithmError:
-            LOGGER.warning("netlify_proxy_auth_failure reason=invalid_algorithm")
-            return jsonify({"error": "Proxy authorization required."}), 403
-        except jwt.InvalidSignatureError:
-            LOGGER.warning("netlify_proxy_auth_failure reason=signature_mismatch")
-            return jsonify({"error": "Proxy authorization required."}), 403
         except jwt.PyJWTError:
-            LOGGER.warning("netlify_proxy_auth_failure reason=malformed_or_invalid_token")
             return jsonify({"error": "Proxy authorization required."}), 403
-        mismatched_claims = []
-        if claims.get("deploy_context") != proxy_auth.deploy_context:
-            mismatched_claims.append("deploy_context")
-        if claims.get("netlify_id") != proxy_auth.site_id:
-            mismatched_claims.append("netlify_id")
-        if claims.get("site_url") != proxy_auth.site_url:
-            mismatched_claims.append("site_url")
-        if mismatched_claims:
-            if mismatched_claims == ["site_url"]:
-                LOGGER.warning("netlify_proxy_auth_observed site_url=%s", claims["site_url"])
-            LOGGER.warning("netlify_proxy_auth_failure reason=invalid_claim mismatched_claims=%s", ",".join(mismatched_claims))
+        if (
+            claims.get("deploy_context") != proxy_auth.deploy_context
+            or claims.get("netlify_id") != proxy_auth.site_id
+            or claims.get("site_url") != proxy_auth.site_url
+        ):
             return jsonify({"error": "Proxy authorization required."}), 403
         return None
 
