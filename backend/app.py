@@ -116,6 +116,8 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
         if claims.get("site_url") != proxy_auth.site_url:
             mismatched_claims.append("site_url")
         if mismatched_claims:
+            if mismatched_claims == ["site_url"]:
+                LOGGER.warning("netlify_proxy_auth_observed site_url=%s", claims["site_url"])
             LOGGER.warning("netlify_proxy_auth_failure reason=invalid_claim mismatched_claims=%s", ",".join(mismatched_claims))
             return jsonify({"error": "Proxy authorization required."}), 403
         return None

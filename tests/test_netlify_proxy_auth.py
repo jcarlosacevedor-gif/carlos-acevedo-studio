@@ -100,7 +100,7 @@ class NetlifyProxyAuthTests(unittest.TestCase):
                 self.assertEqual(response.json, {"error": "Proxy authorization required."})
                 self.assertIn(expected_reason, output)
                 for name in claim_names: self.assertIn(name, output)
-                for secret in ("PAYPALORDER123", "secret-auth", "sandbox-test-secret", "https://secret-claim.example", "secret-site", "secret-context"):
+                for secret in ("PAYPALORDER123", "secret-auth", "sandbox-test-secret", "secret-site", "secret-context"):
                     self.assertNotIn(secret, output)
                 service.resolve_paypal_order.assert_not_called()
 
@@ -125,3 +125,20 @@ class NetlifyProxyAuthTests(unittest.TestCase):
                 self.assertNotIn("secret-auth", output)
                 self.assertNotIn("sandbox-test-secret", output)
                 service.resolve_paypal_order.assert_not_called()
+
+    def test_observes_only_authenticated_site_url_mismatch(self):
+        observed = "https://actual-branch.example.test"
+        service = Mock()
+        with patch.dict(os.environ, AUTH, clear=True), self.assertLogs("backend.app", level="WARNING") as logs:
+            response = create_app(order_service=service).test_client().get("/api/paypal/orders/resolve?token=PAYPALORDER123", headers={"x-nf-sign": self.token(site_url=observed), "Authorization": "secret-auth"})
+        output = "\n".join(logs.output)
+        self.assertEqual(response.status_code, 403)
+        self.assertIn(f"netlify_proxy_auth_observed site_url={observed}", output)
+        self.assertNotIn("sandbox-test-secret", output)
+        self.assertNotIn("PAYPALORDER123", output)
+        self.assertNotIn("secret-auth", output)
+        service.resolve_paypal_order.assert_not_called()
+        service = Mock()
+        with patch.dict(os.environ, AUTH, clear=True), self.assertLogs("backend.app", level="WARNING") as logs:
+            create_app(order_service=service).test_client().get("/api/paypal/orders/resolve?token=PAYPALORDER123", headers={"x-nf-sign": "not.a.jwt"})
+        self.assertNotIn("netlify_proxy_auth_observed", "\n".join(logs.output))
