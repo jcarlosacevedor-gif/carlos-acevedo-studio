@@ -82,3 +82,24 @@ class NetlifyProxyAuthTests(unittest.TestCase):
             with self.assertRaises(ConfigurationError): get_netlify_proxy_auth_config()
         with patch.dict(os.environ, {"PAYPAL_ENVIRONMENT": "live", "NETLIFY_PROXY_SIGNING_SECRET": "partial"}, clear=True):
             with self.assertRaises(ConfigurationError): create_app()
+
+    def test_failure_logs_are_sanitized_categories_before_service(self):
+        cases = [
+            ({}, "reason=missing_header", []),
+            ({"x-nf-sign": "malformed.jwt.value"}, "reason=invalid_signature", []),
+            ({"x-nf-sign": self.token(site_url="https://secret-claim.example")}, "reason=invalid_claim", ["site_url"]),
+            ({"x-nf-sign": self.token(netlify_id="secret-site", deploy_context="secret-context")}, "reason=invalid_claim", ["netlify_id", "deploy_context"]),
+        ]
+        for headers, expected_reason, claim_names in cases:
+            with self.subTest(reason=expected_reason):
+                service = Mock()
+                with patch.dict(os.environ, AUTH, clear=True), self.assertLogs("backend.app", level="WARNING") as logs:
+                    response = create_app(order_service=service).test_client().get("/api/paypal/orders/resolve?token=PAYPALORDER123", headers={**headers, "Authorization": "secret-auth"})
+                output = "\n".join(logs.output)
+                self.assertEqual(response.status_code, 403)
+                self.assertEqual(response.json, {"error": "Proxy authorization required."})
+                self.assertIn(expected_reason, output)
+                for name in claim_names: self.assertIn(name, output)
+                for secret in ("PAYPALORDER123", "secret-auth", "sandbox-test-secret", "https://secret-claim.example", "secret-site", "secret-context"):
+                    self.assertNotIn(secret, output)
+                service.resolve_paypal_order.assert_not_called()
