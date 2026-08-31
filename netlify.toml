@@ -3,6 +3,12 @@
   to = "https://carlos-acevedo-studio-backend-preview.onrender.com/api/:splat"
   status = 200
   force = true
+  signed = "NETLIFY_PROXY_SIGNING_SECRET"
+
+  [redirects.rate_limit]
+    window_limit = 12
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
 
 [[redirects]]
   from = "/paypal/return"

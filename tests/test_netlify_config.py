@@ -13,6 +13,12 @@ EXPECTED_REDIRECTS = [
         "to": f"{RENDER_API_ORIGIN}/api/:splat",
         "status": 200,
         "force": True,
+        "signed": "NETLIFY_PROXY_SIGNING_SECRET",
+        "rate_limit": {
+            "window_limit": 12,
+            "window_size": 60,
+            "aggregate_by": ["ip", "domain"],
+        },
     },
     {
         "from": "/paypal/return",
@@ -50,6 +56,7 @@ class NetlifyProxyConfigurationTests(unittest.TestCase):
         )
         self.assertTrue(all(rule["force"] is True for rule in static_rules))
         self.assertTrue(all(not rule["to"].startswith(RENDER_API_ORIGIN) for rule in static_rules))
+        self.assertTrue(all("signed" not in rule and "rate_limit" not in rule for rule in static_rules))
 
     def test_api_is_the_only_rule_targeting_render(self):
         render_rules = [rule for rule in self.redirects if rule["to"].startswith(RENDER_API_ORIGIN)]
@@ -70,6 +77,11 @@ class NetlifyProxyConfigurationTests(unittest.TestCase):
         lowered = self.raw_config.lower()
         for marker in ("client_secret", "client_id", "authorization", "password", "token="):
             self.assertNotIn(marker, lowered)
+
+    def test_api_proxy_uses_expected_signing_variable_and_edge_rate_limit(self):
+        api_rule = self.redirects[0]
+        self.assertEqual(api_rule["signed"], "NETLIFY_PROXY_SIGNING_SECRET")
+        self.assertEqual(api_rule["rate_limit"], {"window_limit": 12, "window_size": 60, "aggregate_by": ["ip", "domain"]})
 
 
 class SameOriginPaymentFrontendTests(unittest.TestCase):
