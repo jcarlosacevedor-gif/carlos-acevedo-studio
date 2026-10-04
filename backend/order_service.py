@@ -7,7 +7,7 @@ from typing import Any
 import uuid
 
 from .order_store import OrderStore, OrderStoreError
-from .paypal_client import PayPalAmbiguousResultError, PayPalClientError
+from .paypal_client import PayPalAmbiguousResultError, PayPalCaptureNotAttemptedError, PayPalClientError
 from .pricing import PricingError, calculate_custom_song_price
 
 
@@ -158,9 +158,8 @@ class OrderService:
                     raise OrderServiceError(
                         "Capture outcome is uncertain; order remains CAPTURING.", 503
                     ) from error
-                except PayPalClientError as error:
-                    # Step 14: FALLO DETERMINISTA DE CAPTURE
-                    # For deterministic failures where we know capture did NOT occur
+                except PayPalCaptureNotAttemptedError as error:
+                    # The client guarantees the Capture POST was never sent.
                     try:
                         self._store.reset_capture_attempt(
                             record.local_order_id, persisted_request_id
@@ -168,6 +167,12 @@ class OrderService:
                     except OrderStoreError:
                         pass  # Best effort; order may remain CAPTURING
                     raise OrderServiceError("Capture failed deterministically.", 502) from error
+                except PayPalClientError as error:
+                    # Unknown client failures after the attempt are conservative: keep
+                    # CAPTURING and its request ID for Show-first reconciliation.
+                    raise OrderServiceError(
+                        "Capture outcome is uncertain; order remains CAPTURING.", 503
+                    ) from error
 
                 # Step 8-9: VERIFICACION ESTRICTA y MARK PAID
                 return self._finalize_paid(
@@ -226,7 +231,7 @@ class OrderService:
                 raise OrderServiceError(
                     "Capture outcome is uncertain; order remains CAPTURING.", 503
                 ) from error
-            except PayPalClientError as error:
+            except PayPalCaptureNotAttemptedError as error:
                 try:
                     self._store.reset_capture_attempt(
                         record.local_order_id, persisted_request_id
@@ -234,6 +239,10 @@ class OrderService:
                 except OrderStoreError:
                     pass
                 raise OrderServiceError("Capture failed deterministically.", 502) from error
+            except PayPalClientError as error:
+                raise OrderServiceError(
+                    "Capture outcome is uncertain; order remains CAPTURING.", 503
+                ) from error
 
             return self._finalize_paid(
                 capture_result, record, persisted_request_id

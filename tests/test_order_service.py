@@ -291,6 +291,73 @@ class OrderServiceCaptureTests(unittest.TestCase):
             self.service.capture_order(record.local_order_id)
         self.assertEqual(ctx.exception.status_code, 503)
         self.assertIn("uncertain", str(ctx.exception))
+        reloaded = self.store.get_by_local_order_id(record.local_order_id)
+        attempted_request_id = self.paypal_client.capture_order.call_args.args[1]
+        self.assertEqual(reloaded.status, "CAPTURING")
+        self.assertEqual(reloaded.capture_request_id, attempted_request_id)
+
+    def test_ambiguous_capture_then_show_completed_marks_paid_without_second_post(self):
+        from backend.paypal_client import PayPalAmbiguousResultError
+
+        record = self.create_local_order()
+        self.attach_paypal_order(record)
+        self.paypal_client.show_order.return_value = {
+            "order_id": "PAYPALORDER123",
+            "order_status": "APPROVED",
+        }
+        self.paypal_client.capture_order.side_effect = PayPalAmbiguousResultError("Ambiguous")
+
+        with self.assertRaises(OrderServiceError):
+            self.service.capture_order(record.local_order_id)
+        capturing = self.store.get_by_local_order_id(record.local_order_id)
+        original_request_id = capturing.capture_request_id
+
+        self.paypal_client.show_order.return_value = {
+            "order_id": "PAYPALORDER123",
+            "order_status": "COMPLETED",
+            "capture_id": "CAPTURE123",
+            "capture_status": "COMPLETED",
+            "amount": "199.00",
+            "currency": "USD",
+        }
+        result = self.service.capture_order(record.local_order_id)
+
+        self.assertEqual(result["status"], "PAID")
+        self.assertEqual(self.paypal_client.capture_order.call_count, 1)
+        paid = self.store.get_by_local_order_id(record.local_order_id)
+        self.assertEqual(paid.capture_request_id, original_request_id)
+
+    def test_ambiguous_capture_then_show_approved_reuses_same_request_id(self):
+        from backend.paypal_client import PayPalAmbiguousResultError
+
+        record = self.create_local_order()
+        self.attach_paypal_order(record)
+        self.paypal_client.show_order.return_value = {
+            "order_id": "PAYPALORDER123",
+            "order_status": "APPROVED",
+        }
+        completed = {
+            "order_id": "PAYPALORDER123",
+            "order_status": "COMPLETED",
+            "capture_id": "CAPTURE123",
+            "capture_status": "COMPLETED",
+            "amount": "199.00",
+            "currency": "USD",
+        }
+        self.paypal_client.capture_order.side_effect = [
+            PayPalAmbiguousResultError("Ambiguous"),
+            completed,
+        ]
+
+        with self.assertRaises(OrderServiceError):
+            self.service.capture_order(record.local_order_id)
+        original_request_id = self.store.get_by_local_order_id(record.local_order_id).capture_request_id
+
+        result = self.service.capture_order(record.local_order_id)
+
+        self.assertEqual(result["status"], "PAID")
+        attempted_ids = [call.args[1] for call in self.paypal_client.capture_order.call_args_list]
+        self.assertEqual(attempted_ids, [original_request_id, original_request_id])
 
     # --- DETERMINISTIC CAPTURE FAILURE ---
 
@@ -302,9 +369,9 @@ class OrderServiceCaptureTests(unittest.TestCase):
             "order_id": "PAYPALORDER123",
             "order_status": "APPROVED",
         }
-        from backend.paypal_client import PayPalClientError
-        self.paypal_client.capture_order.side_effect = PayPalClientError(
-            "Deterministic failure"
+        from backend.paypal_client import PayPalCaptureNotAttemptedError
+        self.paypal_client.capture_order.side_effect = PayPalCaptureNotAttemptedError(
+            "Capture POST was not sent"
         )
 
         with self.assertRaises(OrderServiceError) as ctx:
@@ -316,6 +383,7 @@ class OrderServiceCaptureTests(unittest.TestCase):
         # Check that the order went back to PAYPAL_CREATED
         reloaded = self.store.get_by_local_order_id(record.local_order_id)
         self.assertEqual(reloaded.status, "PAYPAL_CREATED")
+        self.assertIsNone(reloaded.capture_request_id)
 
     # --- MISMATCHES ---
 
@@ -542,9 +610,9 @@ class OrderServiceCaptureTests(unittest.TestCase):
         reloaded = self.store.get_by_local_order_id(record.local_order_id)
         self.assertEqual(reloaded.status, "CAPTURING")
 
-    # --- 4xx determinista -> reset PAYPAL_CREATED ---
+    # --- Generic/post-POST 4xx is not proven deterministic ---
 
-    def test_deterministic_4xx_capture_failure_resets(self):
+    def test_unclassified_4xx_capture_failure_preserves_capturing(self):
         from backend.paypal_client import PayPalClientError
         record = self.create_local_order()
         self.attach_paypal_order(record)
@@ -559,10 +627,11 @@ class OrderServiceCaptureTests(unittest.TestCase):
 
         with self.assertRaises(OrderServiceError) as ctx:
             self.service.capture_order(record.local_order_id)
-        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.status_code, 503)
         reloaded = self.store.get_by_local_order_id(record.local_order_id)
-        self.assertEqual(reloaded.status, "PAYPAL_CREATED")
-        self.assertIsNone(reloaded.capture_request_id)
+        self.assertEqual(reloaded.status, "CAPTURING")
+        attempted_request_id = self.paypal_client.capture_order.call_args.args[1]
+        self.assertEqual(reloaded.capture_request_id, attempted_request_id)
 
     # --- Capture remoto COMPLETED + mark_paid falla -> CAPTURING ---
 

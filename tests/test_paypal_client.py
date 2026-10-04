@@ -8,6 +8,7 @@ from urllib.error import HTTPError
 from backend.config import PayPalConfig
 from backend.paypal_client import (
     PayPalAmbiguousResultError,
+    PayPalCaptureNotAttemptedError,
     PayPalClient,
     PayPalClientError,
     PayPalResponseError,
@@ -167,20 +168,56 @@ class PayPalClientTests(unittest.TestCase):
         })
         self.assertNotIn(ACCESS_TOKEN, result.values())
 
-    def test_capture_rejects_invalid_id_incomplete_response_and_http_error(self):
-        with self.assertRaises(PayPalClientError):
+    def test_capture_classifies_preflight_failure_as_not_attempted(self):
+        with self.assertRaises(PayPalCaptureNotAttemptedError):
             self.client.capture_order("invalid-id!", "capture")
 
+        oauth_error = HTTPError("https://example.invalid", 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+        with patch("backend.paypal_client.urlopen", side_effect=oauth_error) as mocked_open:
+            with self.assertRaises(PayPalCaptureNotAttemptedError):
+                self.client.capture_order("ORDER", "capture")
+        self.assertEqual(mocked_open.call_count, 1)
+
+    def test_capture_2xx_incomplete_response_is_ambiguous(self):
         with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse({"id": "ORDER", "status": "COMPLETED"})]):
-            with self.assertRaises(PayPalResponseError):
+            with self.assertRaises(PayPalAmbiguousResultError):
                 self.client.capture_order("ORDER", "capture")
 
-        error = HTTPError("https://example.invalid", 500, "Server Error", {}, io.BytesIO(b"{}"))
-        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), error]):
-            with self.assertRaises(PayPalClientError) as raised:
+    def test_capture_2xx_incompatible_response_is_ambiguous(self):
+        response = {
+            "id": "ORDER",
+            "status": "COMPLETED",
+            "purchase_units": [{"payments": {"captures": [{
+                "id": "CAPTURE", "status": "COMPLETED", "amount": None,
+            }]}}],
+        }
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(response)]):
+            with self.assertRaises(PayPalAmbiguousResultError):
                 self.client.capture_order("ORDER", "capture")
-        self.assertNotIn(CLIENT_SECRET, str(raised.exception))
-        self.assertNotIn(ACCESS_TOKEN, str(raised.exception))
+
+    def test_capture_2xx_invalid_json_is_ambiguous(self):
+        with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), FakeResponse(b"not json")]):
+            with self.assertRaises(PayPalAmbiguousResultError):
+                self.client.capture_order("ORDER", "capture")
+
+    def test_capture_http_errors_after_post_are_ambiguous(self):
+        for status in (400, 408, 429, 500, 503):
+            with self.subTest(status=status):
+                error = HTTPError("https://example.invalid", status, "Capture Error", {}, io.BytesIO(b"{}"))
+                with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), error]):
+                    with self.assertRaises(PayPalAmbiguousResultError) as raised:
+                        self.client.capture_order("ORDER", "capture")
+                self.assertNotIn(CLIENT_SECRET, str(raised.exception))
+                self.assertNotIn(ACCESS_TOKEN, str(raised.exception))
+
+    def test_capture_timeout_and_connection_error_after_post_are_ambiguous(self):
+        from urllib.error import URLError
+
+        for error in (TimeoutError("timed out"), URLError("connection lost")):
+            with self.subTest(error=type(error).__name__):
+                with patch("backend.paypal_client.urlopen", side_effect=[self.oauth_response(), error]):
+                    with self.assertRaises(PayPalAmbiguousResultError):
+                        self.client.capture_order("ORDER", "capture")
 
     def test_show_order_uses_get_and_bearer(self):
         order_response = {"id": "ORDER123", "status": "APPROVED", "purchase_units": [{"payments": {}}]}

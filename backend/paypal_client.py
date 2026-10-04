@@ -35,6 +35,10 @@ class PayPalAmbiguousResultError(PayPalClientError):
     """The request may have reached PayPal; reconcile with the same request ID."""
 
 
+class PayPalCaptureNotAttemptedError(PayPalClientError):
+    """The Capture POST was definitely not sent to PayPal."""
+
+
 class PayPalClient:
     """Encapsulates OAuth and Orders v2 requests without pricing knowledge."""
 
@@ -74,7 +78,7 @@ class PayPalClient:
             if error.code in (408, 429) or (500 <= error.code <= 599):
                 raise PayPalAmbiguousResultError(f"PayPal request failed (HTTP {error.code}).") from error
             raise PayPalClientError(f"PayPal request failed (HTTP {error.code}).") from error
-        except URLError as error:
+        except (URLError, TimeoutError, OSError) as error:
             raise PayPalAmbiguousResultError("PayPal request outcome is unknown.") from error
 
         try:
@@ -227,9 +231,13 @@ class PayPalClient:
 
     def capture_order(self, order_id: str, request_id: str) -> dict[str, str | None]:
         """Capture a payer-approved order and return only verification fields."""
-        order_id = self._validate_order_id(order_id)
-        request_id = self._validate_request_id(request_id)
-        access_token = self._get_access_token()
+        try:
+            order_id = self._validate_order_id(order_id)
+            request_id = self._validate_request_id(request_id)
+            access_token = self._get_access_token()
+        except PayPalClientError as error:
+            # All of these failures happen before the Capture request is built or sent.
+            raise PayPalCaptureNotAttemptedError("PayPal capture was not attempted.") from error
         request = Request(
             f"{self._config.api_base_url}/v2/checkout/orders/{order_id}/capture",
             data=b"{}",
@@ -241,12 +249,17 @@ class PayPalClient:
             },
             method="POST",
         )
-        response = self._request_json(request)
-        capture = self._extract_capture(response)
-        captured_order_id = response.get("id")
-        order_status = response.get("status")
-        if not isinstance(captured_order_id, str) or not isinstance(order_status, str):
-            raise PayPalResponseError("PayPal returned an incomplete capture response.")
+        try:
+            response = self._request_json(request)
+            capture = self._extract_capture(response)
+            captured_order_id = response.get("id")
+            order_status = response.get("status")
+            if not isinstance(captured_order_id, str) or not isinstance(order_status, str):
+                raise PayPalResponseError("PayPal returned an incomplete capture response.")
+        except PayPalClientError as error:
+            # Once urlopen is called for Capture, neither an HTTP error nor an
+            # invalid/incomplete response proves that the remote mutation did not occur.
+            raise PayPalAmbiguousResultError("PayPal capture outcome is unknown.") from error
         return {
             "order_id": captured_order_id,
             "order_status": order_status,
@@ -290,9 +303,13 @@ class PayPalClient:
     def _extract_capture(response: dict[str, Any]) -> dict[str, Any]:
         try:
             capture = response["purchase_units"][0]["payments"]["captures"][0]
-            amount = capture["amount"]
         except (KeyError, IndexError, TypeError) as error:
             raise PayPalResponseError("PayPal returned an incomplete capture response.") from error
+        if not isinstance(capture, dict):
+            raise PayPalResponseError("PayPal returned an incompatible capture response.")
+        amount = capture.get("amount")
+        if not isinstance(amount, dict):
+            raise PayPalResponseError("PayPal returned an incompatible capture response.")
         if (
             not isinstance(capture.get("status"), str)
             or not isinstance(amount.get("value"), str)
