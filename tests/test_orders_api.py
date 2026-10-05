@@ -1,3 +1,5 @@
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -409,32 +411,65 @@ class ResolveEndpointTests(unittest.TestCase):
         paypal_order_id = create_resp.json["paypal_order_id"]
 
         # Now resolve with the paypal_order_id as token
-        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        response = self.client.post("/api/paypal/orders/resolve", json={"token": paypal_order_id})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"local_order_id": local_order_id})
 
     def test_resolve_token_absent_returns_400(self):
-        response = self.client.get("/api/paypal/orders/resolve")
+        response = self.client.post("/api/paypal/orders/resolve", json={})
         self.assertEqual(response.status_code, 400)
 
     def test_resolve_empty_token_returns_400(self):
-        response = self.client.get("/api/paypal/orders/resolve?token=")
+        response = self.client.post("/api/paypal/orders/resolve", json={"token": ""})
         self.assertEqual(response.status_code, 400)
 
     def test_resolve_invalid_token_format_returns_400(self):
         # Token with special characters is invalid
-        response = self.client.get("/api/paypal/orders/resolve?token=INVALID!")
+        response = self.client.post("/api/paypal/orders/resolve", json={"token": "INVALID!"})
         self.assertEqual(response.status_code, 400)
 
     def test_resolve_valid_unknown_token_returns_404(self):
-        response = self.client.get("/api/paypal/orders/resolve?token=PAYPAL999")
+        response = self.client.post("/api/paypal/orders/resolve", json={"token": "PAYPAL999"})
         self.assertEqual(response.status_code, 404)
+
+    def test_resolve_rejects_invalid_json_and_non_json_content_type(self):
+        invalid_json = self.client.post(
+            "/api/paypal/orders/resolve",
+            data=b'{"token":',
+            content_type="application/json",
+        )
+        non_json = self.client.post(
+            "/api/paypal/orders/resolve",
+            data="token=PAYPAL999",
+            content_type="application/x-www-form-urlencoded",
+        )
+        self.assertEqual(invalid_json.status_code, 400)
+        self.assertEqual(invalid_json.json, {"error": "Invalid JSON body."})
+        self.assertEqual(non_json.status_code, 400)
+        self.assertEqual(non_json.json, {"error": "A JSON object is required."})
+
+    def test_resolve_query_token_is_not_accepted_and_get_is_not_supported(self):
+        get_response = self.client.get("/api/paypal/orders/resolve?token=PAYPAL999")
+        post_without_body_token = self.client.post(
+            "/api/paypal/orders/resolve?token=PAYPAL999",
+            json={},
+        )
+        self.assertEqual(get_response.status_code, 405)
+        self.assertEqual(post_without_body_token.status_code, 400)
+
+    def test_resolve_rejects_payer_id_and_other_extra_fields(self):
+        response = self.client.post(
+            "/api/paypal/orders/resolve",
+            json={"token": "PAYPAL999", "PayerID": "BUYER999"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json, {"error": "Resolve endpoint accepts only a token."})
 
     def test_resolve_response_contains_only_local_order_id(self):
         create_resp = self.client.post("/api/paypal/orders", json={"product":"custom-song","solo":"guitar-solo","brief":{"secret":"data"}})
         paypal_order_id = create_resp.json["paypal_order_id"]
 
-        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        response = self.client.post("/api/paypal/orders/resolve", json={"token": paypal_order_id})
         self.assertEqual(response.status_code, 200)
         json_data = response.json
         self.assertEqual(set(json_data.keys()), {"local_order_id"})
@@ -454,7 +489,7 @@ class ResolveEndpointTests(unittest.TestCase):
         initial_calls = len(paypal.calls) if hasattr(paypal, 'calls') else 0
 
         # Resolve should not call PayPal
-        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        response = self.client.post("/api/paypal/orders/resolve", json={"token": paypal_order_id})
         self.assertEqual(response.status_code, 200)
 
         # PayPal calls should not have increased
@@ -466,7 +501,7 @@ class ResolveEndpointTests(unittest.TestCase):
         paypal_order_id = create_resp.json["paypal_order_id"]
 
         # Resolve
-        response = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        response = self.client.post("/api/paypal/orders/resolve", json={"token": paypal_order_id})
         self.assertEqual(response.status_code, 200)
 
         # Check status in SQLite is still PAYPAL_CREATED (unchanged)
@@ -477,6 +512,23 @@ class ResolveEndpointTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual(status, "PAYPAL_CREATED")
+
+    def test_resolve_does_not_log_token_or_payer_id_sentinels(self):
+        token_sentinel = "LOGTOKEN999"
+        payer_sentinel = "LOGPAYER999"
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            response = self.client.post(
+                "/api/paypal/orders/resolve",
+                json={"token": token_sentinel, "PayerID": payer_sentinel},
+            )
+        self.assertEqual(response.status_code, 400)
+        combined = stdout.getvalue() + stderr.getvalue()
+        self.assertNotIn(token_sentinel, combined)
+        self.assertNotIn(payer_sentinel, combined)
+        self.assertNotIn("Authorization", combined)
+        self.assertNotIn("x-nf-sign", combined)
 
 
 class ReturnUrlConfigTests(unittest.TestCase):
@@ -550,7 +602,7 @@ class ResolveArchitectureTests(unittest.TestCase):
             paypal_order_id = create_resp.json["paypal_order_id"]
 
             # Call resolve endpoint
-            response = client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+            response = client.post("/api/paypal/orders/resolve", json={"token": paypal_order_id})
             self.assertEqual(response.status_code, 200)
 
             # Verify resolve_paypal_order was called on the service

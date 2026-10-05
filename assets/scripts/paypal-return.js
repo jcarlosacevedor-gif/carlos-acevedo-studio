@@ -1,4 +1,16 @@
 (() => {
+  // Read PayPal's return parameters once, keep only the token in memory, and
+  // remove both token and PayerID from the visible URL/history immediately.
+  const returnToken = (() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token") || null;
+    params.get("PayerID"); // Deliberately read and discard; it is not needed.
+    const cleanUrl = `${window.location.pathname}${window.location.hash}`;
+    window.history.replaceState(null, "", cleanUrl);
+    return token;
+  })();
+
   // ============================================================================
   // STRING DEFINITIONS
   // ============================================================================
@@ -61,32 +73,15 @@
   const returnActions = getElement("return-actions");
 
   // ============================================================================
-  // TOKEN EXTRACTION
-  // ============================================================================
-  function getToken() {
-    if (typeof window === "undefined") return null;
-    const params = new URLSearchParams(window.location.search);
-    return params.get("token") || null;
-  }
-
-  // ============================================================================
-  // URL ENCODING
-  // ============================================================================
-  function encodeToken(token) {
-    return encodeURIComponent(token);
-  }
-
-  // ============================================================================
   // API CALLS
   // ============================================================================
   async function resolveOrder(token) {
-    const encodedToken = encodeToken(token);
-    const url = `/api/paypal/orders/resolve?token=${encodedToken}`;
-    const response = await fetch(url, {
-      method: "GET",
+    const response = await fetch("/api/paypal/orders/resolve", {
+      method: "POST",
       headers: {
         "Content-Type": "application/json"
-      }
+      },
+      body: JSON.stringify({ token })
     });
     return response;
   }
@@ -194,7 +189,7 @@
     if (isConfirming) return;
     isConfirming = true;
 
-    const token = getToken();
+    const token = returnToken;
 
     // If no token, show fatal error - cannot resolve
     if (!token) {

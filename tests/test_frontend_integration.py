@@ -651,6 +651,11 @@ class ReturnPageTests(unittest.TestCase):
         content = path.read_text(encoding="utf-8")
         self.assertIn("paypal-return.js", content)
 
+    def test_return_page_has_no_referrer_policy(self):
+        path = Path(__file__).parent.parent / "paypal-return.html"
+        content = path.read_text(encoding="utf-8")
+        self.assertIn('<meta name="referrer" content="no-referrer">', content)
+
     def test_return_page_has_required_elements(self):
         path = Path(__file__).parent.parent / "paypal-return.html"
         content = path.read_text(encoding="utf-8")
@@ -682,9 +687,28 @@ class ReturnPageJSTests(unittest.TestCase):
         self.assertIn("URLSearchParams", self.content)
         self.assertIn("window.location.search", self.content)
 
-    def test_resolve_call_with_encodeURIComponent(self):
-        self.assertIn("encodeURIComponent", self.content)
-        self.assertIn("/api/paypal/orders/resolve?token=", self.content)
+    def test_resolve_uses_post_json_without_query_string(self):
+        resolve_section = self.content[
+            self.content.find("async function resolveOrder"):
+            self.content.find("async function captureOrder")
+        ]
+        self.assertIn('fetch("/api/paypal/orders/resolve"', resolve_section)
+        self.assertIn('method: "POST"', resolve_section)
+        self.assertIn('JSON.stringify({ token })', resolve_section)
+        self.assertNotIn("?token=", resolve_section)
+        self.assertNotIn("PayerID", resolve_section)
+
+    def test_return_parameters_are_read_then_url_is_cleaned_immediately(self):
+        extraction_position = self.content.find("new URLSearchParams(window.location.search)")
+        cleanup_position = self.content.find("window.history.replaceState")
+        resolve_position = self.content.find("async function resolveOrder")
+        self.assertGreaterEqual(extraction_position, 0)
+        self.assertGreater(cleanup_position, extraction_position)
+        self.assertLess(cleanup_position, resolve_position)
+        self.assertIn('params.get("token")', self.content)
+        self.assertIn('params.get("PayerID")', self.content)
+        self.assertIn("window.location.pathname", self.content)
+        self.assertIn("window.location.hash", self.content)
 
     def test_capture_call_with_local_order_id(self):
         self.assertIn("/api/paypal/orders/", self.content)
@@ -729,6 +753,7 @@ class ReturnPageJSTests(unittest.TestCase):
     def test_no_sessionStorage(self):
         self.assertNotIn("sessionStorage", self.content)
         self.assertNotIn("localStorage", self.content)
+        self.assertNotIn("document.cookie", self.content)
 
     def test_no_PayPal_SDK(self):
         self.assertNotIn("paypal.com/sdk/js", self.content)
@@ -786,7 +811,7 @@ class ReturnBackendIntegrationTests(unittest.TestCase):
         paypal_order_id = create_resp.json["paypal_order_id"]
 
         # Resolve
-        resolve_resp = self.client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        resolve_resp = self.client.post("/api/paypal/orders/resolve", json={"token": paypal_order_id})
         self.assertEqual(resolve_resp.status_code, 200)
         local_order_id = resolve_resp.json["local_order_id"]
         self.assertIsNotNone(local_order_id)
@@ -800,12 +825,12 @@ class ReturnBackendIntegrationTests(unittest.TestCase):
 
     def test_resolve_missing_token_returns_400(self):
         """Test resolve without token returns 400"""
-        resolve_resp = self.client.get("/api/paypal/orders/resolve")
+        resolve_resp = self.client.post("/api/paypal/orders/resolve", json={})
         self.assertEqual(resolve_resp.status_code, 400)
 
     def test_resolve_invalid_token_returns_404(self):
         """Test resolve with invalid token returns 404"""
-        resolve_resp = self.client.get("/api/paypal/orders/resolve?token=INVALID999")
+        resolve_resp = self.client.post("/api/paypal/orders/resolve", json={"token": "INVALID999"})
         self.assertEqual(resolve_resp.status_code, 404)
 
     def test_capture_without_resolve_fails(self):
@@ -872,7 +897,7 @@ class ReturnBackendIntegrationTests(unittest.TestCase):
         paypal_order_id = create_resp.json["paypal_order_id"]
 
         # Resolve
-        resolve_resp = client.get(f"/api/paypal/orders/resolve?token={paypal_order_id}")
+        resolve_resp = client.post("/api/paypal/orders/resolve", json={"token": paypal_order_id})
         local_order_id = resolve_resp.json["local_order_id"]
 
         # Capture - paypal returns CREATED (not approved) -> should return 409

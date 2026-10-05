@@ -117,10 +117,17 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
         return send_from_directory(PROJECT_ROOT, "paypal-cancel.html")
 
     @app.get("/api/paypal/orders/resolve")
+    def reject_get_paypal_order_resolution():
+        raise APIError("Resolve endpoint requires POST.", 405)
+
+    @app.post("/api/paypal/orders/resolve")
     def resolve_paypal_order():
-        token = request.args.get("token")
-        if not token:
-            raise APIError("Token parameter is required.", 400)
+        payload = _json_object()
+        if set(payload) != {"token"}:
+            raise APIError("Resolve endpoint accepts only a token.", 400)
+        token = payload.get("token")
+        if not isinstance(token, str) or not token:
+            raise APIError("Token is required.", 400)
         try:
             validate_order_id(token)
         except (ValueError, PayPalClientError):

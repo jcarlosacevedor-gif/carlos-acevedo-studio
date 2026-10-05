@@ -39,7 +39,11 @@ class NetlifyProxyAuthTests(unittest.TestCase):
         with patch.dict(os.environ, AUTH, clear=True):
             client = create_app(order_service=service).test_client()
             self.assertEqual(client.get("/health").status_code, 200)
-            response = client.get("/api/paypal/orders/resolve?token=PAYPALORDER123", headers={"x-nf-sign": self.token()})
+            response = client.post(
+                "/api/paypal/orders/resolve",
+                json={"token": "PAYPALORDER123"},
+                headers={"x-nf-sign": self.token()},
+            )
         self.assertEqual(response.status_code, 200)
         service.resolve_paypal_order.assert_called_once()
 
@@ -51,7 +55,11 @@ class NetlifyProxyAuthTests(unittest.TestCase):
                 with patch.dict(os.environ, AUTH, clear=True):
                     client = create_app(order_service=service).test_client()
                     headers = {} if signature is None else {"x-nf-sign": signature, "X-Forwarded-For": "forged", "Forwarded": "forged"}
-                    response = client.get("/api/paypal/orders/resolve?token=PAYPALORDER123", headers=headers)
+                    response = client.post(
+                        "/api/paypal/orders/resolve",
+                        json={"token": "PAYPALORDER123"},
+                        headers=headers,
+                    )
                 self.assertEqual(response.status_code, 403)
                 self.assertEqual(response.json, {"error": "Proxy authorization required."})
                 service.resolve_paypal_order.assert_not_called()
@@ -68,7 +76,11 @@ class NetlifyProxyAuthTests(unittest.TestCase):
             with self.subTest(signature=signature[:8]):
                 service = Mock()
                 with patch.dict(os.environ, AUTH, clear=True):
-                    response = create_app(order_service=service).test_client().get("/api/paypal/orders/resolve?token=PAYPALORDER123", headers={"x-nf-sign": signature})
+                    response = create_app(order_service=service).test_client().post(
+                        "/api/paypal/orders/resolve",
+                        json={"token": "PAYPALORDER123"},
+                        headers={"x-nf-sign": signature},
+                    )
                 self.assertEqual(response.status_code, 403)
                 self.assertEqual(response.json, {"error": "Proxy authorization required."})
                 service.resolve_paypal_order.assert_not_called()

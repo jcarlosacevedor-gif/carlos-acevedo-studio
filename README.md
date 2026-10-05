@@ -78,7 +78,7 @@ python -m backend.sqlite_backup create --environment sandbox --source-db C:\ruta
 
 Genera una copia SQLite y un manifiesto JSON con checksum SHA-256. No es una herramienta de restore ni un mecanismo de almacenamiento externo.
 
-El endpoint `GET /api/paypal/orders/resolve?token=<paypal_order_id>` permite correlacionar un PayPal Order ID con el `local_order_id` local. Este endpoint solo realiza lookup en SQLite y no modifica estados ni consulta PayPal. **El token recibido del navegador NO es autoridad**: se valida sintácticamente, debe existir como `paypal_order_id` persistido en SQLite, y solo sirve para correlación. La verificación definitiva de pago ocurre durante Capture. La correlación server-side permite al frontend obtener el identificador local necesario para llamar al endpoint Capture.
+El endpoint `POST /api/paypal/orders/resolve`, con body JSON `{"token":"<paypal_order_id>"}`, permite correlacionar un PayPal Order ID con el `local_order_id` local sin volver a poner el token en un query string. Este endpoint solo realiza lookup en SQLite y no modifica estados ni consulta PayPal. **El token recibido del navegador NO es autoridad**: se valida sintácticamente, debe existir como `paypal_order_id` persistido en SQLite, y solo sirve para correlación. La página de retorno conserva el token únicamente en memoria, elimina de inmediato `token` y `PayerID` de la URL mediante `history.replaceState`, y aplica `Referrer-Policy: no-referrer`. La verificación definitiva de pago ocurre durante Capture.
 
 ## Administración segura de órdenes CAPTURING
 

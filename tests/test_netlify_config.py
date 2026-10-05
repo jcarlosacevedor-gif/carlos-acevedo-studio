@@ -90,7 +90,9 @@ class SameOriginPaymentFrontendTests(unittest.TestCase):
         paypal_return = (PROJECT_ROOT / "assets" / "scripts" / "paypal-return.js").read_text(encoding="utf-8")
 
         self.assertIn('fetch("/api/paypal/orders"', custom_order)
-        self.assertIn("/api/paypal/orders/resolve?token=", paypal_return)
+        self.assertIn('fetch("/api/paypal/orders/resolve"', paypal_return)
+        self.assertIn('method: "POST"', paypal_return)
+        self.assertNotIn("/api/paypal/orders/resolve?token=", paypal_return)
         self.assertIn("/api/paypal/orders/", paypal_return)
         self.assertNotIn("onrender.com", custom_order)
         self.assertNotIn("onrender.com", paypal_return)
