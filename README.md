@@ -80,4 +80,22 @@ Genera una copia SQLite y un manifiesto JSON con checksum SHA-256. No es una her
 
 El endpoint `GET /api/paypal/orders/resolve?token=<paypal_order_id>` permite correlacionar un PayPal Order ID con el `local_order_id` local. Este endpoint solo realiza lookup en SQLite y no modifica estados ni consulta PayPal. **El token recibido del navegador NO es autoridad**: se valida sintácticamente, debe existir como `paypal_order_id` persistido en SQLite, y solo sirve para correlación. La verificación definitiva de pago ocurre durante Capture. La correlación server-side permite al frontend obtener el identificador local necesario para llamar al endpoint Capture.
 
+## Administración segura de órdenes CAPTURING
+
+La CLI administrativa usa `ORDER_DB_PATH`. `list` e `inspect` abren SQLite en modo read-only y no requieren credenciales PayPal:
+
+```bash
+python -m backend.order_admin list --status CAPTURING --older-than 2m --limit 50
+python -m backend.order_admin inspect <LOCAL_ORDER_ID>
+```
+
+Para una orden `CAPTURING`, `reconcile` consulta PayPal mediante Show Order y es dry-run por defecto. En ese caso requiere `PAYPAL_ENVIRONMENT`, `PAYPAL_CLIENT_ID` y `PAYPAL_CLIENT_SECRET` desde el entorno:
+
+```bash
+python -m backend.order_admin reconcile <LOCAL_ORDER_ID>
+python -m backend.order_admin reconcile <LOCAL_ORDER_ID> --apply-paid
+```
+
+`--apply-paid` solo permite `CAPTURING -> PAID` cuando ya existe un `capture_request_id` y Show Order confirma estrictamente la misma orden, una captura `COMPLETED`, capture ID, importe y moneda. La CLI nunca ejecuta PayPal Capture, no genera request IDs, no ofrece `force`, SQL libre ni cambios arbitrarios de estado. Sus salidas usan referencias truncadas y excluyen `brief_json`, identificadores PayPal completos, tokens, secretos y payloads remotos.
+
 El frontend todavía no está conectado al backend en esta iteración. La integración de return/cancel pages se realizará en una iteración posterior.

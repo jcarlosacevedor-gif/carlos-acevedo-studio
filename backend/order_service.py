@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any
 import uuid
 
@@ -17,6 +18,66 @@ FORBIDDEN_FIELDS = frozenset({"amount", "amount_cents", "price", "total", "curre
 def _format_amount_cents(amount_cents: int) -> str:
     """Format positive integer cents as a decimal string without floating point."""
     return f"{amount_cents // 100}.{amount_cents % 100:02d}"
+
+
+@dataclass(frozen=True)
+class CaptureReconciliationEvaluation:
+    remote_order_status: str | None
+    order_id_matches: bool
+    capture_present: bool
+    capture_completed: bool
+    amount_matches: bool
+    currency_matches: bool
+    action: str
+    capture_id: str | None
+
+
+def evaluate_capture_reconciliation(
+    record: Any,
+    paypal_order: dict[str, Any],
+) -> CaptureReconciliationEvaluation:
+    """Evaluate Show Order data without mutating locally or calling Capture."""
+    remote_order_status = paypal_order.get("order_status")
+    capture_id = paypal_order.get("capture_id")
+    order_id_matches = paypal_order.get("order_id") == record.paypal_order_id
+    capture_present = isinstance(capture_id, str) and bool(capture_id.strip())
+    capture_completed = paypal_order.get("capture_status") == "COMPLETED"
+    amount_matches = paypal_order.get("amount") == _format_amount_cents(record.amount_cents)
+    currency_matches = paypal_order.get("currency") == record.currency
+    eligible = (
+        record.status == "CAPTURING"
+        and bool(record.capture_request_id)
+        and bool(record.paypal_order_id)
+        and remote_order_status == "COMPLETED"
+        and order_id_matches
+        and capture_present
+        and capture_completed
+        and amount_matches
+        and currency_matches
+    )
+    if eligible:
+        action = "eligible_for_apply_paid"
+    elif (
+        record.status == "CAPTURING"
+        and remote_order_status == "APPROVED"
+        and order_id_matches
+        and bool(record.capture_request_id)
+    ):
+        action = "retry_requires_existing_capture_request_id"
+    elif record.status == "CAPTURING" and remote_order_status == "CREATED":
+        action = "no_action"
+    else:
+        action = "manual_review"
+    return CaptureReconciliationEvaluation(
+        remote_order_status=remote_order_status if isinstance(remote_order_status, str) else None,
+        order_id_matches=order_id_matches,
+        capture_present=capture_present,
+        capture_completed=capture_completed,
+        amount_matches=amount_matches,
+        currency_matches=currency_matches,
+        action=action,
+        capture_id=capture_id if capture_present else None,
+    )
 
 
 class OrderServiceError(ValueError):
@@ -109,12 +170,9 @@ class OrderService:
         except PayPalClientError as error:
             raise OrderServiceError("PayPal order lookup failed.", 502) from error
 
-        paypal_order_id = paypal_order["order_id"]
         order_status = paypal_order["order_status"]
         capture_id = paypal_order.get("capture_id")
         capture_status = paypal_order.get("capture_status")
-        capture_amount = paypal_order.get("amount")
-        capture_currency = paypal_order.get("currency")
 
         # Handle state based on local state and PayPal response
         if record.status == "PAYPAL_CREATED":
@@ -186,19 +244,15 @@ class OrderService:
 
         if order_status == "COMPLETED" and capture_status == "COMPLETED":
             # Step 11: CAPTURING + PAYPAL COMPLETED
-            # Verify all fields match
-            if (paypal_order_id != record.paypal_order_id or
-                capture_id is None or not capture_id or
-                capture_amount is None or capture_currency is None or
-                capture_amount != _format_amount_cents(record.amount_cents) or
-                capture_currency != record.currency):
+            evaluation = evaluate_capture_reconciliation(record, paypal_order)
+            if evaluation.action != "eligible_for_apply_paid":
                 # Step 12 verification: mismatches
                 raise OrderServiceError(
                     "PayPal capture data does not match local order.", 400
                 )
             # Step 9: MARK PAID
             try:
-                paid_record = self._store.mark_paid(
+                paid_record = self._store.mark_capturing_paid(
                     record.local_order_id,
                     record.paypal_order_id,
                     capture_id,

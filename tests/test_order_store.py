@@ -240,6 +240,58 @@ class OrderStoreTests(unittest.TestCase):
         )
         self.assertEqual(paid.status, "PAID")
 
+    def test_mark_capturing_paid_is_cas_and_idempotent(self):
+        record = self.create()
+        self.attach(record)
+        self.store.begin_capture(record.local_order_id, "capture-req-1")
+        paid = self.store.mark_capturing_paid(
+            record.local_order_id,
+            "PAYPALORDER123",
+            "CAPTURE123",
+            22_400,
+            "USD",
+            "capture-req-1",
+        )
+        repeated = self.store.mark_capturing_paid(
+            record.local_order_id,
+            "PAYPALORDER123",
+            "CAPTURE123",
+            22_400,
+            "USD",
+            "capture-req-1",
+        )
+        self.assertEqual(paid.status, "PAID")
+        self.assertEqual(paid, repeated)
+
+    def test_mark_capturing_paid_rejects_wrong_state_or_request_id(self):
+        paypal_created = self.create(create_request_id="paypal-created")
+        self.attach(paypal_created, "PAYPALORDER456")
+        with self.assertRaises(OrderStoreError):
+            self.store.mark_capturing_paid(
+                paypal_created.local_order_id,
+                "PAYPALORDER456",
+                "CAPTURE456",
+                22_400,
+                "USD",
+                "capture-req-2",
+            )
+
+        capturing = self.create(create_request_id="capturing")
+        self.attach(capturing, "PAYPALORDER789")
+        self.store.begin_capture(capturing.local_order_id, "capture-req-3")
+        with self.assertRaises(OrderStoreError):
+            self.store.mark_capturing_paid(
+                capturing.local_order_id,
+                "PAYPALORDER789",
+                "CAPTURE789",
+                22_400,
+                "USD",
+                "different-request-id",
+            )
+        unchanged = self.store.get_by_local_order_id(capturing.local_order_id)
+        self.assertEqual(unchanged.status, "CAPTURING")
+        self.assertIsNone(unchanged.paypal_capture_id)
+
     def test_reopen_preserves_capturing_and_request_id(self):
         record = self.create()
         self.attach(record)

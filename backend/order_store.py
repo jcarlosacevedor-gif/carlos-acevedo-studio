@@ -43,6 +43,23 @@ class OrderRecord:
     capture_request_id: str | None
 
 
+@dataclass(frozen=True)
+class AdminOrderRecord:
+    """Operational metadata that deliberately excludes brief and create request data."""
+
+    local_order_id: str
+    created_at: str
+    updated_at: str
+    product: str
+    solo: str
+    amount_cents: int
+    currency: str
+    paypal_order_id: str | None
+    paypal_capture_id: str | None
+    status: str
+    capture_request_id: str | None
+
+
 class OrderStore:
     """SQLite-backed order store using a short-lived connection per operation.
 
@@ -58,12 +75,26 @@ class OrderStore:
     failures where PayPal did not capture.
     """
 
-    def __init__(self, database_path: str | Path):
+    def __init__(
+        self,
+        database_path: str | Path,
+        *,
+        initialize: bool = True,
+        read_only: bool = False,
+    ):
         self._database_path = str(database_path)
-        self._initialize()
+        self._read_only = read_only
+        if initialize and read_only:
+            raise OrderStoreError("Read-only stores cannot initialize or migrate a database.")
+        if initialize:
+            self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self._database_path)
+        if self._read_only:
+            database_uri = f"file:{Path(self._database_path).resolve().as_posix()}?mode=ro"
+            connection = sqlite3.connect(database_uri, uri=True)
+        else:
+            connection = sqlite3.connect(self._database_path)
         connection.row_factory = sqlite3.Row
         return connection
 
@@ -261,6 +292,24 @@ class OrderStore:
             capture_request_id=row["capture_request_id"],
         )
 
+    @staticmethod
+    def _admin_record_from_row(row: sqlite3.Row | None) -> AdminOrderRecord | None:
+        if row is None:
+            return None
+        return AdminOrderRecord(
+            local_order_id=row["local_order_id"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            product=row["product"],
+            solo=row["solo"],
+            amount_cents=row["amount_cents"],
+            currency=row["currency"],
+            paypal_order_id=row["paypal_order_id"],
+            paypal_capture_id=row["paypal_capture_id"],
+            status=row["status"],
+            capture_request_id=row["capture_request_id"],
+        )
+
     def create_order_record(
         self,
         *,
@@ -303,6 +352,50 @@ class OrderStore:
         with self._connection() as connection:
             row = connection.execute("SELECT * FROM custom_song_orders WHERE paypal_order_id = ?", (paypal_order_id,)).fetchone()
         return self._record_from_row(row)
+
+    def get_admin_order(self, local_order_id: str) -> AdminOrderRecord | None:
+        """Read operational fields without selecting brief_json or create_request_id."""
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT local_order_id, created_at, updated_at, product, solo,
+                       amount_cents, currency, paypal_order_id, paypal_capture_id,
+                       status, capture_request_id
+                FROM custom_song_orders
+                WHERE local_order_id = ?
+                """,
+                (local_order_id,),
+            ).fetchone()
+        return self._admin_record_from_row(row)
+
+    def list_admin_orders(
+        self,
+        *,
+        status: str,
+        limit: int,
+        updated_before: str | None = None,
+    ) -> list[AdminOrderRecord]:
+        """List oldest operational records without reading private brief data."""
+        if status not in STATUSES:
+            raise OrderStoreError("Invalid order status.")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
+            raise OrderStoreError("Limit must be between 1 and 200.")
+        query = """
+            SELECT local_order_id, created_at, updated_at, product, solo,
+                   amount_cents, currency, paypal_order_id, paypal_capture_id,
+                   status, capture_request_id
+            FROM custom_song_orders
+            WHERE status = ?
+        """
+        parameters: list[object] = [status]
+        if updated_before is not None:
+            query += " AND updated_at <= ?"
+            parameters.append(updated_before)
+        query += " ORDER BY updated_at ASC, id ASC LIMIT ?"
+        parameters.append(limit)
+        with self._connection() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return [record for row in rows if (record := self._admin_record_from_row(row)) is not None]
 
     def attach_paypal_order(self, local_order_id: str, paypal_order_id: str) -> OrderRecord:
         paypal_order_id = validate_order_id(paypal_order_id)
@@ -371,6 +464,67 @@ class OrderStore:
                     """,
                     (capture_id, capture_request_id, now, local_order_id),
                 )
+        except sqlite3.IntegrityError as error:
+            raise OrderStoreError("Capture is already attached to another local order.") from error
+        updated = self.get_by_local_order_id(local_order_id)
+        assert updated is not None
+        return updated
+
+    def mark_capturing_paid(
+        self,
+        local_order_id: str,
+        paypal_order_id: str,
+        capture_id: str,
+        amount_cents: int,
+        currency: str,
+        expected_capture_request_id: str,
+    ) -> OrderRecord:
+        """CAS reconciliation from CAPTURING to PAID using the persisted request ID."""
+        paypal_order_id = validate_order_id(paypal_order_id)
+        capture_id = self._nonempty_text(capture_id, "Capture ID")
+        currency = self._nonempty_text(currency, "Currency")
+        expected_capture_request_id = self._nonempty_text(
+            expected_capture_request_id, "Expected capture request ID"
+        )
+        if not isinstance(amount_cents, int) or isinstance(amount_cents, bool) or amount_cents <= 0:
+            raise OrderStoreError("Amount must be a positive integer number of cents.")
+        now = self._now()
+        try:
+            with self._connection() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    "SELECT * FROM custom_song_orders WHERE local_order_id = ?",
+                    (local_order_id,),
+                ).fetchone()
+                record = self._record_from_row(row)
+                if record is None:
+                    raise OrderStoreError("Local order was not found.")
+                if record.paypal_order_id != paypal_order_id:
+                    raise OrderStoreError("PayPal order does not match the local order.")
+                if record.amount_cents != amount_cents or record.currency != currency:
+                    raise OrderStoreError("Captured payment does not match the stored price.")
+                if record.status == "PAID":
+                    if (
+                        record.paypal_capture_id == capture_id
+                        and record.capture_request_id == expected_capture_request_id
+                    ):
+                        return record
+                    raise OrderStoreError("A different capture is already recorded for this order.")
+                if record.status != "CAPTURING":
+                    raise OrderStoreError("Only a CAPTURING order can be reconciled as paid.")
+                if record.capture_request_id != expected_capture_request_id:
+                    raise OrderStoreError("Capture request ID does not match.")
+                cursor = connection.execute(
+                    """
+                    UPDATE custom_song_orders
+                    SET paypal_capture_id = ?, status = 'PAID', updated_at = ?
+                    WHERE local_order_id = ? AND status = 'CAPTURING'
+                      AND capture_request_id = ?
+                    """,
+                    (capture_id, now, local_order_id, expected_capture_request_id),
+                )
+                if cursor.rowcount != 1:
+                    raise OrderStoreError("Order changed during reconciliation.")
         except sqlite3.IntegrityError as error:
             raise OrderStoreError("Capture is already attached to another local order.") from error
         updated = self.get_by_local_order_id(local_order_id)
