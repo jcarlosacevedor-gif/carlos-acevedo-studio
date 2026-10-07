@@ -149,6 +149,12 @@ Exit codes de `audit-stale`:
 
 La edad solo clasifica. Ninguna orden se marca `FAILED` o `CANCELLED` por antigüedad.
 
+### Endpoint operacional stale
+
+`POST /internal/audit-stale` ejecuta la misma auditoría read-only con autenticación independiente mediante `Authorization: Bearer <OPS_AUDIT_TOKEN>`. Está previsto para un futuro Render Cron a través de red privada; ese Cron aún no se configura.
+
+El endpoint responde `200 {"status":"ok"}`, `200 {"status":"warning"}`, `409 {"status":"critical"}` o `500 {"status":"error"}`. No devuelve findings, IDs ni otros detalles operacionales; la investigación se realiza con `python -m backend.order_admin audit-stale`. Todas sus respuestas usan `Cache-Control: no-store`.
+
 ### Runbook
 
 Regla central: **NUNCA hacer Capture manual “para probar”**.

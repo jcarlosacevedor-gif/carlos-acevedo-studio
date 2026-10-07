@@ -16,6 +16,7 @@ from .order_service import evaluate_capture_reconciliation
 from .order_store import AdminOrderRecord, OrderStore, OrderStoreError, STATUSES
 from .observability import emit_event, safe_ref
 from .paypal_client import PayPalClient, PayPalClientError, PayPalConfigurationError
+from .stale_audit import audit_stale, emit_stale_events
 
 
 MAX_LIST_LIMIT = 200
@@ -180,16 +181,6 @@ def _resolve_admin_record(store: OrderStore, args: argparse.Namespace) -> AdminO
     return record
 
 
-def _age_seconds(record: AdminOrderRecord, current: datetime) -> int:
-    try:
-        updated = datetime.fromisoformat(record.updated_at)
-    except (TypeError, ValueError) as error:
-        raise OrderAdminError("Order has an invalid operational timestamp.") from error
-    if updated.tzinfo is None:
-        updated = updated.replace(tzinfo=timezone.utc)
-    return max(0, int((current - updated.astimezone(timezone.utc)).total_seconds()))
-
-
 def _run_audit_stale(
     stdout: TextIO,
     stderr: TextIO,
@@ -198,63 +189,13 @@ def _run_audit_stale(
     thresholds = get_stale_order_thresholds()
     store = _load_store(read_only=True)
     current = now or datetime.now(timezone.utc)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=timezone.utc)
-    current = current.astimezone(timezone.utc)
-    findings: list[dict[str, object]] = []
-    highest_exit = 0
-
-    for status in ("CAPTURING", "PENDING", "PAYPAL_CREATED"):
-        for record in store.list_admin_orders_for_audit(status):
-            age = _age_seconds(record, current)
-            level: str | None = None
-            reason: str | None = None
-            classification: str | None = None
-            exit_code = 0
-            if status in {"CAPTURING", "PENDING"}:
-                if age >= thresholds.capturing_critical_seconds:
-                    level, reason, exit_code = "ERROR", "stale_critical", 3
-                    classification = "critical_manual_review" if status == "CAPTURING" else "manual_review"
-                elif age >= thresholds.capturing_warning_seconds:
-                    level, reason, exit_code = "WARNING", "stale_warning", 2
-                    classification = "warning" if status == "CAPTURING" else "attention"
-            elif age >= 86400:
-                level, reason = "WARNING", "stale_warning"
-                classification = "probable_abandoned_checkout"
-            if level is None or reason is None or classification is None:
-                continue
-            reference = _safe_ref(record.local_order_id)
-            finding = {
-                "local_order_ref": reference,
-                "status": status,
-                "age_seconds": age,
-                "classification": classification,
-            }
-            findings.append(finding)
-            if status == "PAYPAL_CREATED":
-                continue
-            emit_event(
-                "stale_order_detected",
-                level=level,
-                local_order_ref=reference,
-                status_from=status,
-                operation="stale_scan",
-                outcome=(
-                    "critical" if exit_code == 3 else
-                    "warning" if status == "CAPTURING" else
-                    "attention" if status == "PENDING" else
-                    "probable_abandoned_checkout"
-                ),
-                reason_code=reason,
-                source="stale_scan",
-                paypal_order_present=record.paypal_order_id is not None,
-                paypal_capture_present=record.paypal_capture_id is not None,
-                capture_request_present=record.capture_request_id is not None,
-            )
-            highest_exit = max(highest_exit, exit_code)
-
-    _write_json(stdout, {"findings": findings, "result": "incidents" if highest_exit > 0 else "ok"})
-    return highest_exit
+    try:
+        report = audit_stale(store, thresholds, current)
+    except (TypeError, ValueError) as error:
+        raise OrderAdminError("Order has an invalid operational timestamp.") from error
+    emit_stale_events(report, emitter=emit_event)
+    _write_json(stdout, report.as_payload())
+    return report.highest_exit
 
 
 def _run_reconcile(

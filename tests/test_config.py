@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from backend.config import ConfigurationError, PayPalConfig, get_public_site_base_url
+from backend.config import ConfigurationError, PayPalConfig, get_ops_audit_token, get_public_site_base_url
 
 
 class PayPalConfigTests(unittest.TestCase):
@@ -22,6 +22,36 @@ class PayPalConfigTests(unittest.TestCase):
             with self.assertRaises(ConfigurationError) as raised:
                 PayPalConfig.from_environment(require_credentials=True)
         self.assertNotIn("SECRET", str(raised.exception).upper())
+
+
+class OpsAuditTokenTests(unittest.TestCase):
+    def test_sandbox_allows_missing_token(self):
+        with patch.dict(os.environ, {"PAYPAL_ENVIRONMENT": "sandbox"}, clear=True):
+            self.assertIsNone(get_ops_audit_token())
+
+    def test_live_requires_token_without_disclosing_a_value(self):
+        sentinel = "PRIVATE_OPS_TOKEN_SENTINEL"
+        with patch.dict(
+            os.environ,
+            {"PAYPAL_ENVIRONMENT": "live", "OPS_AUDIT_TOKEN": sentinel},
+            clear=True,
+        ):
+            with self.assertRaises(ConfigurationError) as raised:
+                get_ops_audit_token()
+        self.assertNotIn(sentinel, str(raised.exception))
+
+        with patch.dict(os.environ, {"PAYPAL_ENVIRONMENT": "live"}, clear=True):
+            with self.assertRaises(ConfigurationError):
+                get_ops_audit_token()
+
+    def test_valid_high_entropy_token_is_returned(self):
+        token = "ops_" + "x" * 40
+        with patch.dict(
+            os.environ,
+            {"PAYPAL_ENVIRONMENT": "sandbox", "OPS_AUDIT_TOKEN": token},
+            clear=True,
+        ):
+            self.assertEqual(get_ops_audit_token(), token)
 
 
 class PublicSiteBaseUrlTests(unittest.TestCase):

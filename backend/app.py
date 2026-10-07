@@ -1,18 +1,22 @@
 """Flask placeholder API for the future PayPal integration."""
 
+from datetime import datetime, timezone
+import hmac
 from pathlib import Path
 import re
+import sqlite3
 
 from flask import Flask, jsonify, request, send_from_directory
-from werkzeug.exceptions import BadRequest, HTTPException
+from werkzeug.exceptions import BadRequest, HTTPException, MethodNotAllowed
 
-from .config import ConfigurationError, PayPalConfig, get_netlify_proxy_auth_config, get_order_db_path, get_public_site_base_url, get_stale_order_thresholds
+from .config import ConfigurationError, PayPalConfig, get_netlify_proxy_auth_config, get_ops_audit_token, get_order_db_path, get_public_site_base_url, get_stale_order_thresholds
 import jwt
 from .observability import emit_event
 from .pricing import PricingError, calculate_custom_song_price
-from .order_store import OrderStore
+from .order_store import OrderStore, OrderStoreError
 from .order_service import OrderService, OrderServiceError
 from .paypal_client import PayPalClient, PayPalClientError, validate_order_id
+from .stale_audit import audit_stale, emit_stale_events
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -63,16 +67,36 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
     app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
     try:
         proxy_auth = get_netlify_proxy_auth_config()
-        get_stale_order_thresholds()
+        stale_thresholds = get_stale_order_thresholds()
+        ops_audit_token = get_ops_audit_token()
     except ConfigurationError:
-        emit_event(
-            "operational_error",
-            operation="configuration",
-            outcome="failed",
-            reason_code="configuration_error",
-            source="api",
-        )
+        try:
+            emit_event(
+                "operational_error",
+                operation="configuration",
+                outcome="failed",
+                reason_code="configuration_error",
+                source="api",
+            )
+        except Exception:
+            pass
         raise
+
+    def emit_operational_error(reason_code: str) -> None:
+        try:
+            emit_event(
+                "operational_error",
+                operation="stale_scan",
+                outcome="failed",
+                reason_code=reason_code,
+                source="api",
+            )
+        except Exception:
+            pass
+
+    def audit_response(status: str, status_code: int):
+        return jsonify({"status": status}), status_code
+
     def service_for_request():
         if order_service is not None:
             return order_service
@@ -112,6 +136,12 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
             return jsonify({"error": "Proxy authorization required."}), 403
         return None
 
+    @app.after_request
+    def disable_internal_audit_caching(response):
+        if request.path == "/internal/audit-stale":
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.get("/")
     def home_page():
         return send_from_directory(PROJECT_ROOT, "index.html")
@@ -119,6 +149,62 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
     @app.get("/health")
     def health():
         return jsonify({"status": "ok"}), 200
+
+    @app.post("/internal/audit-stale", provide_automatic_options=False)
+    def internal_audit_stale():
+        supplied_authorization = request.headers.get("Authorization", "")
+        expected_authorization = (
+            f"Bearer {ops_audit_token}"
+            if ops_audit_token is not None
+            else "Bearer 00000000000000000000000000000000"
+        )
+        authorized = hmac.compare_digest(supplied_authorization, expected_authorization)
+        if ops_audit_token is None or not authorized:
+            return audit_response("error", 403)
+
+        if request.query_string or request.content_length not in (None, 0):
+            return audit_response("error", 400)
+        if request.get_data(cache=False):
+            return audit_response("error", 400)
+
+        try:
+            path = Path(database_path) if database_path is not None else get_order_db_path()
+            if not path.is_file():
+                raise OrderStoreError("Order database does not exist.")
+            store = OrderStore(path, initialize=False, read_only=True)
+            report = audit_stale(store, stale_thresholds, datetime.now(timezone.utc))
+        except ConfigurationError:
+            emit_operational_error("configuration_error")
+            return audit_response("error", 500)
+        except (OrderStoreError, sqlite3.Error, OSError, TypeError, ValueError):
+            emit_operational_error("sqlite_error")
+            return audit_response("error", 500)
+        except Exception:
+            emit_operational_error("sqlite_error")
+            return audit_response("error", 500)
+
+        try:
+            emit_stale_events(report)
+        except Exception:
+            pass
+        responses = {
+            0: ("ok", 200),
+            2: ("warning", 200),
+            3: ("critical", 409),
+        }
+        response = responses.get(report.highest_exit)
+        if response is None:
+            emit_operational_error("sqlite_error")
+            return audit_response("error", 500)
+        return audit_response(*response)
+
+    @app.route(
+        "/internal/audit-stale",
+        methods=["GET", "OPTIONS"],
+        provide_automatic_options=False,
+    )
+    def reject_get_internal_audit():
+        raise MethodNotAllowed()
 
     @app.get("/paypal/return")
     def paypal_return_page():

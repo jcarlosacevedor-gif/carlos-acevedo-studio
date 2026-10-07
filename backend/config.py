@@ -16,6 +16,24 @@ class StaleOrderThresholds:
     capturing_critical_seconds: int
 
 
+OPS_AUDIT_TOKEN_MIN_LENGTH = 32
+
+
+def get_ops_audit_token() -> str | None:
+    """Return the independent operations token, optional outside live."""
+    environment = os.environ.get("PAYPAL_ENVIRONMENT", "sandbox").strip().lower()
+    if environment not in PAYPAL_API_BASE_URLS:
+        raise ConfigurationError("PAYPAL_ENVIRONMENT must be 'sandbox' or 'live'.")
+    token = os.environ.get("OPS_AUDIT_TOKEN")
+    if token is None or token == "":
+        if environment == "live":
+            raise ConfigurationError("Live requires OPS_AUDIT_TOKEN.")
+        return None
+    if len(token) < OPS_AUDIT_TOKEN_MIN_LENGTH or any(character.isspace() for character in token):
+        raise ConfigurationError("OPS_AUDIT_TOKEN must be a high-entropy token without whitespace.")
+    return token
+
+
 def _positive_integer_environment(name: str, default: int) -> int:
     raw = os.environ.get(name)
     if raw is None:
