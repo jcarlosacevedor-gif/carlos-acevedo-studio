@@ -11,11 +11,13 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import sqlite3
 from typing import Any
 import uuid
 
 from .config import REQUEST_ID_MAX_LENGTH
+from .observability import emit_event, safe_ref
 from .paypal_client import validate_order_id
 
 
@@ -397,6 +399,41 @@ class OrderStore:
             rows = connection.execute(query, parameters).fetchall()
         return [record for row in rows if (record := self._admin_record_from_row(row)) is not None]
 
+    def list_admin_orders_for_audit(self, status: str) -> list[AdminOrderRecord]:
+        """Read all operational rows for one state without selecting private fields."""
+        if status not in STATUSES:
+            raise OrderStoreError("Invalid order status.")
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT local_order_id, created_at, updated_at, product, solo,
+                       amount_cents, currency, paypal_order_id, paypal_capture_id,
+                       status, capture_request_id
+                FROM custom_song_orders
+                WHERE status = ?
+                ORDER BY updated_at ASC, id ASC
+                """,
+                (status,),
+            ).fetchall()
+        return [record for row in rows if (record := self._admin_record_from_row(row)) is not None]
+
+    def find_admin_orders_by_local_ref(self, local_order_ref: str) -> list[AdminOrderRecord]:
+        """Resolve one exact safe ref locally without exposing complete identifiers."""
+        if not isinstance(local_order_ref, str) or re.fullmatch(r"local_[0-9a-f]{12}", local_order_ref) is None:
+            raise OrderStoreError("Invalid local order reference.")
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT local_order_id, created_at, updated_at, product, solo,
+                       amount_cents, currency, paypal_order_id, paypal_capture_id,
+                       status, capture_request_id
+                FROM custom_song_orders
+                ORDER BY id ASC
+                """
+            ).fetchall()
+        records = [record for row in rows if (record := self._admin_record_from_row(row)) is not None]
+        return [record for record in records if safe_ref("local", record.local_order_id) == local_order_ref]
+
     def attach_paypal_order(self, local_order_id: str, paypal_order_id: str) -> OrderRecord:
         paypal_order_id = validate_order_id(paypal_order_id)
         now = self._now()
@@ -470,7 +507,7 @@ class OrderStore:
         assert updated is not None
         return updated
 
-    def mark_capturing_paid(
+    def mark_capturing_paid_with_transition(
         self,
         local_order_id: str,
         paypal_order_id: str,
@@ -478,7 +515,7 @@ class OrderStore:
         amount_cents: int,
         currency: str,
         expected_capture_request_id: str,
-    ) -> OrderRecord:
+    ) -> tuple[OrderRecord, bool, str]:
         """CAS reconciliation from CAPTURING to PAID using the persisted request ID."""
         paypal_order_id = validate_order_id(paypal_order_id)
         capture_id = self._nonempty_text(capture_id, "Capture ID")
@@ -508,7 +545,7 @@ class OrderStore:
                         record.paypal_capture_id == capture_id
                         and record.capture_request_id == expected_capture_request_id
                     ):
-                        return record
+                        return record, False, "PAID"
                     raise OrderStoreError("A different capture is already recorded for this order.")
                 if record.status != "CAPTURING":
                     raise OrderStoreError("Only a CAPTURING order can be reconciled as paid.")
@@ -529,7 +566,30 @@ class OrderStore:
             raise OrderStoreError("Capture is already attached to another local order.") from error
         updated = self.get_by_local_order_id(local_order_id)
         assert updated is not None
-        return updated
+        return updated, True, "CAPTURING"
+
+    def mark_capturing_paid(
+        self,
+        local_order_id: str,
+        paypal_order_id: str,
+        capture_id: str,
+        amount_cents: int,
+        currency: str,
+        expected_capture_request_id: str,
+        *,
+        source: str = "api",
+    ) -> OrderRecord:
+        record, transitioned, status_from = self.mark_capturing_paid_with_transition(
+            local_order_id,
+            paypal_order_id,
+            capture_id,
+            amount_cents,
+            currency,
+            expected_capture_request_id,
+        )
+        if transitioned:
+            self._emit_paid(record, source, status_from)
+        return record
 
     def begin_capture(self, local_order_id: str, capture_request_id: str) -> OrderRecord:
         """Transition PAYPAL_CREATED -> CAPTURING with idempotent capture request ID."""
@@ -585,7 +645,7 @@ class OrderStore:
         assert updated is not None
         return updated
 
-    def mark_paid(
+    def mark_paid_with_transition(
         self,
         local_order_id: str,
         paypal_order_id: str,
@@ -593,7 +653,7 @@ class OrderStore:
         amount_cents: int,
         currency: str,
         capture_request_id: str,
-    ) -> OrderRecord:
+    ) -> tuple[OrderRecord, bool, str]:
         paypal_order_id = validate_order_id(paypal_order_id)
         capture_id = self._nonempty_text(capture_id, "Capture ID")
         currency = self._nonempty_text(currency, "Currency")
@@ -614,10 +674,11 @@ class OrderStore:
                     raise OrderStoreError("Captured payment does not match the stored price.")
                 if record.status == "PAID":
                     if record.paypal_capture_id == capture_id:
-                        return record
+                        return record, False, "PAID"
                     raise OrderStoreError("A different capture is already recorded for this order.")
                 if record.status not in {"PAYPAL_CREATED", "CAPTURING"}:
                     raise OrderStoreError("Local order cannot be marked paid in its current state.")
+                status_from = record.status
                 connection.execute(
                     """
                     UPDATE custom_song_orders
@@ -630,7 +691,48 @@ class OrderStore:
             raise OrderStoreError("Capture is already attached to another local order.") from error
         updated = self.get_by_local_order_id(local_order_id)
         assert updated is not None
-        return updated
+        return updated, True, status_from
+
+    def mark_paid(
+        self,
+        local_order_id: str,
+        paypal_order_id: str,
+        capture_id: str,
+        amount_cents: int,
+        currency: str,
+        capture_request_id: str,
+        *,
+        source: str = "api",
+    ) -> OrderRecord:
+        record, transitioned, status_from = self.mark_paid_with_transition(
+            local_order_id,
+            paypal_order_id,
+            capture_id,
+            amount_cents,
+            currency,
+            capture_request_id,
+        )
+        if transitioned:
+            self._emit_paid(record, source, status_from)
+        return record
+
+    @staticmethod
+    def _emit_paid(record: OrderRecord, source: str, status_from: str) -> None:
+        try:
+            emit_event(
+                "paid",
+                local_order_ref=safe_ref("local", record.local_order_id),
+                paypal_order_ref=safe_ref("paypal_order", record.paypal_order_id),
+                paypal_capture_ref=safe_ref("paypal_capture", record.paypal_capture_id),
+                capture_request_ref=safe_ref("capture_request", record.capture_request_id),
+                status_from=status_from,
+                status_to="PAID",
+                operation="mark_paid",
+                outcome="committed",
+                source=source,
+            )
+        except Exception:
+            pass
 
     def mark_failed(self, local_order_id: str) -> OrderRecord:
         """Record a terminal failure without storing potentially sensitive details."""

@@ -11,6 +11,35 @@ class ConfigurationError(ValueError):
 
 
 @dataclass(frozen=True)
+class StaleOrderThresholds:
+    capturing_warning_seconds: int
+    capturing_critical_seconds: int
+
+
+def _positive_integer_environment(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as error:
+        raise ConfigurationError(f"{name} must be a positive integer.") from error
+    if value <= 0:
+        raise ConfigurationError(f"{name} must be a positive integer.")
+    return value
+
+
+def get_stale_order_thresholds() -> StaleOrderThresholds:
+    warning = _positive_integer_environment("ORDER_CAPTURING_WARNING_SECONDS", 300)
+    critical = _positive_integer_environment("ORDER_CAPTURING_CRITICAL_SECONDS", 1800)
+    if critical <= warning:
+        raise ConfigurationError(
+            "ORDER_CAPTURING_CRITICAL_SECONDS must be greater than ORDER_CAPTURING_WARNING_SECONDS."
+        )
+    return StaleOrderThresholds(warning, critical)
+
+
+@dataclass(frozen=True)
 class NetlifyProxyAuthConfig:
     secret: str
     site_id: str

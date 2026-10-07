@@ -6,8 +6,9 @@ import re
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import BadRequest, HTTPException
 
-from .config import ConfigurationError, PayPalConfig, get_netlify_proxy_auth_config, get_order_db_path, get_public_site_base_url
+from .config import ConfigurationError, PayPalConfig, get_netlify_proxy_auth_config, get_order_db_path, get_public_site_base_url, get_stale_order_thresholds
 import jwt
+from .observability import emit_event
 from .pricing import PricingError, calculate_custom_song_price
 from .order_store import OrderStore
 from .order_service import OrderService, OrderServiceError
@@ -60,7 +61,18 @@ def create_app(order_service=None, database_path=None, paypal_client=None) -> Fl
     """Create the local same-origin server without contacting PayPal."""
     app = Flask(__name__, static_folder=str(PROJECT_ROOT), static_url_path="")
     app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
-    proxy_auth = get_netlify_proxy_auth_config()
+    try:
+        proxy_auth = get_netlify_proxy_auth_config()
+        get_stale_order_thresholds()
+    except ConfigurationError:
+        emit_event(
+            "operational_error",
+            operation="configuration",
+            outcome="failed",
+            reason_code="configuration_error",
+            source="api",
+        )
+        raise
     def service_for_request():
         if order_service is not None:
             return order_service

@@ -8,11 +8,60 @@ from typing import Any
 import uuid
 
 from .order_store import OrderStore, OrderStoreError
+from .observability import emit_event, reason_code_for_exception, safe_ref
 from .paypal_client import PayPalAmbiguousResultError, PayPalCaptureNotAttemptedError, PayPalClientError
 from .pricing import PricingError, calculate_custom_song_price
 
 
 FORBIDDEN_FIELDS = frozenset({"amount", "amount_cents", "price", "total", "currency", "quantity", "paypal_order_id", "capture_id", "status", "create_request_id", "capture_request_id"})
+
+
+def _observe(event: str, **fields: object) -> None:
+    """Observability must never affect a financial operation."""
+    try:
+        emit_event(event, **fields)
+    except Exception:
+        pass
+
+
+def _record_refs(record: Any) -> dict[str, str | None]:
+    try:
+        return {
+            "local_order_ref": safe_ref("local", record.local_order_id),
+            "paypal_order_ref": safe_ref("paypal_order", record.paypal_order_id),
+            "paypal_capture_ref": safe_ref("paypal_capture", record.paypal_capture_id),
+            "capture_request_ref": safe_ref("capture_request", record.capture_request_id),
+        }
+    except Exception:
+        return {}
+
+
+def _observe_capture_ambiguous(record: Any, error: BaseException) -> None:
+    _observe(
+        "capture_ambiguous",
+        **_record_refs(record),
+        operation="capture_order",
+        outcome="ambiguous",
+        reason_code=reason_code_for_exception(error),
+        source="api",
+    )
+
+
+def _observe_reconciliation(record: Any, evaluation: "CaptureReconciliationEvaluation", *, source: str = "api") -> None:
+    _observe(
+        "capture_reconciled",
+        level="INFO" if evaluation.action != "manual_review" else "WARNING",
+        **_record_refs(record),
+        operation="reconcile",
+        outcome=evaluation.action,
+        source=source,
+        order_id_matches=evaluation.order_id_matches,
+        capture_present=evaluation.capture_present,
+        capture_completed=evaluation.capture_completed,
+        amount_matches=evaluation.amount_matches,
+        currency_matches=evaluation.currency_matches,
+        applied=False,
+    )
 
 
 def _format_amount_cents(amount_cents: int) -> str:
@@ -108,19 +157,55 @@ class OrderService:
         try:
             record = self._store.create_order_record(product=pricing["product"], solo=pricing["solo"], amount_cents=pricing["amount_cents"], currency=pricing["currency"], brief=brief, create_request_id=request_id)
         except OrderStoreError as error:
+            _observe("operational_error", operation="sqlite", outcome="failed", reason_code="sqlite_error", source="api")
             raise OrderServiceError("Could not persist the local order.", 500) from error
+        _observe(
+            "order_created_local",
+            **_record_refs(record),
+            status_to="PENDING",
+            operation="create_order",
+            outcome="committed",
+            source="api",
+        )
         try:
             remote = self._paypal_client.create_order(record.amount_cents, record.currency, record.create_request_id, return_url=self._return_url, cancel_url=self._cancel_url)
             order_id, approval_url = remote["order_id"], remote["approval_url"]
         except PayPalAmbiguousResultError as error:
+            _observe(
+                "operational_error",
+                **_record_refs(record),
+                operation="create_order",
+                outcome="ambiguous",
+                reason_code="create_ambiguous",
+                source="api",
+            )
             raise OrderServiceError("PayPal order creation outcome requires recovery.", 503) from error
         except (KeyError, TypeError, PayPalClientError, RuntimeError) as error:
-            self._store.mark_failed(record.local_order_id)
+            failed_record = self._store.mark_failed(record.local_order_id)
+            _observe(
+                "failed",
+                **_record_refs(failed_record),
+                status_from="PENDING",
+                status_to="FAILED",
+                operation="create_order",
+                outcome="failed",
+                source="api",
+            )
             raise OrderServiceError("PayPal order creation failed.", 502) from error
         try:
             attached = self._store.attach_paypal_order(record.local_order_id, order_id)
         except OrderStoreError as error:
+            _observe("operational_error", **_record_refs(record), operation="sqlite", outcome="failed", reason_code="sqlite_error", source="api")
             raise OrderServiceError("PayPal order requires recovery before it can be used.", 500) from error
+        _observe(
+            "paypal_order_created",
+            **_record_refs(attached),
+            status_from="PENDING",
+            status_to="PAYPAL_CREATED",
+            operation="attach_paypal_order",
+            outcome="committed",
+            source="api",
+        )
         return {"local_order_id": attached.local_order_id, "paypal_order_id": attached.paypal_order_id, "status": attached.status, "approval_url": approval_url, "amount": f"{attached.amount_cents // 100}.{attached.amount_cents % 100:02d}", "currency": attached.currency}
 
     def capture_order(self, local_order_id: str) -> dict[str, str]:
@@ -133,6 +218,7 @@ class OrderService:
         try:
             record = self._store.get_by_local_order_id(local_order_id)
         except Exception:
+            _observe("operational_error", operation="sqlite", outcome="failed", reason_code="sqlite_error", source="api")
             raise OrderServiceError("Local order lookup failed.", 500)
         if record is None:
             raise OrderServiceError("Local order not found.", 404)
@@ -166,8 +252,10 @@ class OrderService:
         try:
             paypal_order = self._paypal_client.show_order(record.paypal_order_id)
         except PayPalAmbiguousResultError as error:
+            _observe("operational_error", **_record_refs(record), operation="show_order", outcome="failed", reason_code="show_failed", source="api")
             raise OrderServiceError("PayPal order lookup outcome requires recovery.", 503) from error
         except PayPalClientError as error:
+            _observe("operational_error", **_record_refs(record), operation="show_order", outcome="failed", reason_code="show_failed", source="api")
             raise OrderServiceError("PayPal order lookup failed.", 502) from error
 
         order_status = paypal_order["order_status"]
@@ -206,12 +294,23 @@ class OrderService:
                 persisted_request_id = capturing_record.capture_request_id
                 assert persisted_request_id is not None
 
+                _observe(
+                    "capture_started",
+                    **_record_refs(capturing_record),
+                    status_from="PAYPAL_CREATED",
+                    status_to="CAPTURING",
+                    operation="capture_order",
+                    outcome="committed",
+                    source="api",
+                )
+
                 # Step 7: CAPTURE NORMAL
                 try:
                     capture_result = self._paypal_client.capture_order(
                         record.paypal_order_id, persisted_request_id
                     )
                 except PayPalAmbiguousResultError as error:
+                    _observe_capture_ambiguous(capturing_record, error)
                     # Step 13: RESULTADO AMBIGUO
                     raise OrderServiceError(
                         "Capture outcome is uncertain; order remains CAPTURING.", 503
@@ -226,6 +325,7 @@ class OrderService:
                         pass  # Best effort; order may remain CAPTURING
                     raise OrderServiceError("Capture failed deterministically.", 502) from error
                 except PayPalClientError as error:
+                    _observe_capture_ambiguous(capturing_record, error)
                     # Unknown client failures after the attempt are conservative: keep
                     # CAPTURING and its request ID for Show-first reconciliation.
                     raise OrderServiceError(
@@ -242,9 +342,11 @@ class OrderService:
         if record.capture_request_id is None:
             raise OrderServiceError("CAPTURING order has no capture request ID.", 500)
 
+        evaluation = evaluate_capture_reconciliation(record, paypal_order)
+        _observe_reconciliation(record, evaluation)
+
         if order_status == "COMPLETED" and capture_status == "COMPLETED":
             # Step 11: CAPTURING + PAYPAL COMPLETED
-            evaluation = evaluate_capture_reconciliation(record, paypal_order)
             if evaluation.action != "eligible_for_apply_paid":
                 # Step 12 verification: mismatches
                 raise OrderServiceError(
@@ -261,6 +363,7 @@ class OrderService:
                     record.capture_request_id,
                 )
             except OrderStoreError as error:
+                _observe("operational_error", **_record_refs(record), operation="sqlite", outcome="failed", reason_code="sqlite_error", source="api")
                 raise OrderServiceError("Marking paid failed.", 500) from error
             return {
                 "local_order_id": paid_record.local_order_id,
@@ -282,6 +385,7 @@ class OrderService:
                     record.paypal_order_id, persisted_request_id
                 )
             except PayPalAmbiguousResultError as error:
+                _observe_capture_ambiguous(record, error)
                 raise OrderServiceError(
                     "Capture outcome is uncertain; order remains CAPTURING.", 503
                 ) from error
@@ -294,6 +398,7 @@ class OrderService:
                     pass
                 raise OrderServiceError("Capture failed deterministically.", 502) from error
             except PayPalClientError as error:
+                _observe_capture_ambiguous(record, error)
                 raise OrderServiceError(
                     "Capture outcome is uncertain; order remains CAPTURING.", 503
                 ) from error
@@ -342,6 +447,7 @@ class OrderService:
                 capture_request_id,
             )
         except OrderStoreError as error:
+            _observe("operational_error", **_record_refs(record), operation="sqlite", outcome="failed", reason_code="sqlite_error", source="api")
             raise OrderServiceError("Marking paid failed.", 500) from error
 
         return {

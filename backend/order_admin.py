@@ -11,9 +11,10 @@ import sqlite3
 import sys
 from typing import Callable, TextIO
 
-from .config import ConfigurationError, get_order_db_path
+from .config import ConfigurationError, get_order_db_path, get_stale_order_thresholds
 from .order_service import evaluate_capture_reconciliation
 from .order_store import AdminOrderRecord, OrderStore, OrderStoreError, STATUSES
+from .observability import emit_event, safe_ref
 from .paypal_client import PayPalClient, PayPalClientError, PayPalConfigurationError
 
 
@@ -28,10 +29,7 @@ class OrderAdminError(RuntimeError):
 
 
 def _safe_ref(value: str | None) -> str | None:
-    if value is None:
-        return None
-    suffix = value[-8:]
-    return f"...{suffix}"
+    return safe_ref("local", value)
 
 
 def _amount(amount_cents: int) -> str:
@@ -69,17 +67,24 @@ def _parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--limit", type=_parse_limit, default=DEFAULT_LIST_LIMIT)
 
     inspect_parser = subparsers.add_parser("inspect", help="Inspect one order without private brief data.")
-    inspect_parser.add_argument("local_order_id")
+    inspect_parser.add_argument("local_order_id", nargs="?")
+    inspect_parser.add_argument("--ref", dest="local_order_ref")
 
     reconcile_parser = subparsers.add_parser(
         "reconcile",
         help="Run Show Order; never executes PayPal Capture.",
     )
-    reconcile_parser.add_argument("local_order_id")
+    reconcile_parser.add_argument("local_order_id", nargs="?")
+    reconcile_parser.add_argument("--ref", dest="local_order_ref")
     reconcile_parser.add_argument(
         "--apply-paid",
         action="store_true",
         help="Apply CAPTURING -> PAID only when every remote check passes.",
+    )
+
+    subparsers.add_parser(
+        "audit-stale",
+        help="Classify stale payment orders using a read-only SQLite connection.",
     )
     return parser
 
@@ -152,11 +157,104 @@ def _run_list(args: argparse.Namespace, stdout: TextIO, now: datetime | None) ->
 
 def _run_inspect(args: argparse.Namespace, stdout: TextIO) -> int:
     store = _load_store(read_only=True)
-    record = store.get_admin_order(args.local_order_id)
-    if record is None:
-        raise OrderAdminError("Order was not found.")
+    record = _resolve_admin_record(store, args)
     _write_json(stdout, _metadata(record))
     return 0
+
+
+def _resolve_admin_record(store: OrderStore, args: argparse.Namespace) -> AdminOrderRecord:
+    local_order_id = getattr(args, "local_order_id", None)
+    local_order_ref = getattr(args, "local_order_ref", None)
+    if bool(local_order_id) == bool(local_order_ref):
+        raise OrderAdminError("Provide exactly one local order ID or --ref.")
+    if local_order_ref:
+        matches = store.find_admin_orders_by_local_ref(local_order_ref)
+        if not matches:
+            raise OrderAdminError("Order reference was not found.")
+        if len(matches) != 1:
+            raise OrderAdminError("Order reference is not unique.")
+        return matches[0]
+    record = store.get_admin_order(local_order_id)
+    if record is None:
+        raise OrderAdminError("Order was not found.")
+    return record
+
+
+def _age_seconds(record: AdminOrderRecord, current: datetime) -> int:
+    try:
+        updated = datetime.fromisoformat(record.updated_at)
+    except (TypeError, ValueError) as error:
+        raise OrderAdminError("Order has an invalid operational timestamp.") from error
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=timezone.utc)
+    return max(0, int((current - updated.astimezone(timezone.utc)).total_seconds()))
+
+
+def _run_audit_stale(
+    stdout: TextIO,
+    stderr: TextIO,
+    now: datetime | None,
+) -> int:
+    thresholds = get_stale_order_thresholds()
+    store = _load_store(read_only=True)
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    current = current.astimezone(timezone.utc)
+    findings: list[dict[str, object]] = []
+    highest_exit = 0
+
+    for status in ("CAPTURING", "PENDING", "PAYPAL_CREATED"):
+        for record in store.list_admin_orders_for_audit(status):
+            age = _age_seconds(record, current)
+            level: str | None = None
+            reason: str | None = None
+            classification: str | None = None
+            exit_code = 0
+            if status in {"CAPTURING", "PENDING"}:
+                if age >= thresholds.capturing_critical_seconds:
+                    level, reason, exit_code = "ERROR", "stale_critical", 3
+                    classification = "critical_manual_review" if status == "CAPTURING" else "manual_review"
+                elif age >= thresholds.capturing_warning_seconds:
+                    level, reason, exit_code = "WARNING", "stale_warning", 2
+                    classification = "warning" if status == "CAPTURING" else "attention"
+            elif age >= 86400:
+                level, reason = "WARNING", "stale_warning"
+                classification = "probable_abandoned_checkout"
+            if level is None or reason is None or classification is None:
+                continue
+            reference = _safe_ref(record.local_order_id)
+            finding = {
+                "local_order_ref": reference,
+                "status": status,
+                "age_seconds": age,
+                "classification": classification,
+            }
+            findings.append(finding)
+            if status == "PAYPAL_CREATED":
+                continue
+            emit_event(
+                "stale_order_detected",
+                level=level,
+                local_order_ref=reference,
+                status_from=status,
+                operation="stale_scan",
+                outcome=(
+                    "critical" if exit_code == 3 else
+                    "warning" if status == "CAPTURING" else
+                    "attention" if status == "PENDING" else
+                    "probable_abandoned_checkout"
+                ),
+                reason_code=reason,
+                source="stale_scan",
+                paypal_order_present=record.paypal_order_id is not None,
+                paypal_capture_present=record.paypal_capture_id is not None,
+                capture_request_present=record.capture_request_id is not None,
+            )
+            highest_exit = max(highest_exit, exit_code)
+
+    _write_json(stdout, {"findings": findings, "result": "incidents" if highest_exit > 0 else "ok"})
+    return highest_exit
 
 
 def _run_reconcile(
@@ -165,9 +263,7 @@ def _run_reconcile(
     paypal_client_factory: Callable[[], object],
 ) -> int:
     store = _load_store(read_only=not args.apply_paid)
-    record = store.get_admin_order(args.local_order_id)
-    if record is None:
-        raise OrderAdminError("Order was not found.")
+    record = _resolve_admin_record(store, args)
 
     if record.status == "PAID":
         _write_json(stdout, _reconcile_output(record, action="already_reconciled"))
@@ -180,8 +276,37 @@ def _run_reconcile(
         return 3 if args.apply_paid else 0
 
     paypal_client = paypal_client_factory()
-    paypal_order = paypal_client.show_order(record.paypal_order_id)
+    try:
+        paypal_order = paypal_client.show_order(record.paypal_order_id)
+    except PayPalClientError:
+        emit_event(
+            "operational_error",
+            local_order_ref=_safe_ref(record.local_order_id),
+            paypal_order_ref=safe_ref("paypal_order", record.paypal_order_id),
+            operation="show_order",
+            outcome="failed",
+            reason_code="show_failed",
+            source="admin_cli",
+        )
+        raise
     evaluation = evaluate_capture_reconciliation(record, paypal_order)
+    emit_event(
+        "capture_reconciled",
+        level="INFO" if evaluation.action != "manual_review" else "WARNING",
+        local_order_ref=_safe_ref(record.local_order_id),
+        paypal_order_ref=safe_ref("paypal_order", record.paypal_order_id),
+        paypal_capture_ref=safe_ref("paypal_capture", evaluation.capture_id),
+        capture_request_ref=safe_ref("capture_request", record.capture_request_id),
+        operation="reconcile",
+        outcome=evaluation.action,
+        source="admin_cli",
+        order_id_matches=evaluation.order_id_matches,
+        capture_present=evaluation.capture_present,
+        capture_completed=evaluation.capture_completed,
+        amount_matches=evaluation.amount_matches,
+        currency_matches=evaluation.currency_matches,
+        applied=False,
+    )
     payload = _reconcile_output(
         record,
         action=evaluation.action,
@@ -209,6 +334,7 @@ def _run_reconcile(
         record.amount_cents,
         record.currency,
         record.capture_request_id,
+        source="admin_cli",
     )
     payload["action"] = "paid"
     payload["applied"] = True
@@ -234,8 +360,11 @@ def main(
             return _run_list(args, stdout, now)
         if args.command == "inspect":
             return _run_inspect(args, stdout)
+        if args.command == "audit-stale":
+            return _run_audit_stale(stdout, stderr, now)
         return _run_reconcile(args, stdout, paypal_client_factory)
     except ConfigurationError:
+        emit_event("operational_error", operation="configuration", outcome="failed", reason_code="configuration_error", source="admin_cli")
         stderr.write("error: invalid or incomplete configuration.\n")
         return 4
     except OrderAdminError as error:
@@ -248,6 +377,7 @@ def main(
         stderr.write("error: PayPal Show Order failed; no local changes were made.\n")
         return 5
     except (OrderStoreError, sqlite3.Error, OSError):
+        emit_event("operational_error", operation="sqlite", outcome="failed", reason_code="sqlite_error", source="admin_cli")
         stderr.write("error: order database operation failed safely.\n")
         return 4
 

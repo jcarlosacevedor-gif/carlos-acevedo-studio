@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from backend.order_admin import main
+from backend.observability import safe_ref
 from backend.order_store import OrderStore
 from backend.paypal_client import PayPalAmbiguousResultError
 
@@ -129,7 +130,7 @@ class OrderAdminTests(unittest.TestCase):
         self.assertEqual(factory_calls, [])
         payload = json.loads(stdout)
         self.assertEqual(len(payload), 1)
-        self.assertEqual(payload[0]["local_order_ref"], f"...{older.local_order_id[-8:]}")
+        self.assertEqual(payload[0]["local_order_ref"], safe_ref("local", older.local_order_id))
         self.assertEqual(payload[0]["status"], "CAPTURING")
         self.assertNotIn(older.local_order_id, stdout)
         persisted = self.store.get_by_local_order_id(older.local_order_id)
