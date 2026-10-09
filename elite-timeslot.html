@@ -507,8 +507,41 @@
       renderSummary();
     }
 
+    async function submitTimeslotForm(event) {
+      event.preventDefault();
+
+      const form = event.currentTarget;
+      const submitButton = form.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+
+      try {
+        const response = await fetch(form.action, {
+          method: form.method,
+          body: new FormData(form),
+          headers: {
+            Accept: "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error("Formspree rejected the submission.");
+        }
+
+        window.location.assign("thank-you.html");
+      } catch (error) {
+        const language = form.querySelector('input[name="_language"]').value;
+        const message = language === "es"
+          ? "No se pudo enviar la solicitud. Intenta de nuevo."
+          : "The request could not be sent. Please try again.";
+
+        submitButton.disabled = false;
+        window.alert(message);
+      }
+    }
+
     document.querySelectorAll(".timeslot-form").forEach((form) => {
       buildTimeslotPlanner(form);
+      form.addEventListener("submit", submitTimeslotForm);
     });
   </script>
 </body>
