@@ -68,15 +68,35 @@ python -m backend.paypal_sandbox_smoke capture <ORDER_ID> --solo guitar-solo
 
 El backend usa SQLite durable para persistencia de órdenes Custom Song; su archivo de desarrollo vive fuera de Git bajo `instance/`. Los endpoints Flask para Create y Capture ya están implementados y son pruebas automatizadas. El smoke runner Sandbox sigue siendo una herramienta separada para pruebas manuales.
 
-## Backup SQLite local (Sandbox)
+## Backup y restore drill SQLite (Sandbox y Preview)
 
-La primera herramienta de backup es local/test y solo acepta `sandbox`; no llama a PayPal ni opera Render. Requiere una DB existente y un directorio de destino distinto al de la DB:
+La herramienta acepta `sandbox` para bases locales de desarrollo y `preview` para una futura operación controlada en Render Preview. No llama a PayPal. En ambos modos crea el snapshot con la API online backup de SQLite, verifica `integrity_check`, tabla, conteo, versión y SHA-256, y nunca reemplaza un artefacto existente.
+
+Sandbox requiere una DB existente y un directorio destino distinto al de la DB:
 
 ```bash
 python -m backend.sqlite_backup create --environment sandbox --source-db C:\ruta\temporal\orders.sqlite3 --destination-directory C:\ruta\temporal\backups
 ```
 
-Genera una copia SQLite y un manifiesto JSON con checksum SHA-256. No es una herramienta de restore ni un mecanismo de almacenamiento externo.
+También dispone de `verify` y de un restore drill que siempre escribe una DB nueva y aislada:
+
+```bash
+python -m backend.sqlite_backup verify --environment sandbox --backup-db C:\ruta\temporal\backups\orders-sandbox-<UTC>-<UUID>.sqlite3 --manifest C:\ruta\temporal\backups\orders-sandbox-<UTC>-<UUID>.json
+python -m backend.sqlite_backup restore-drill --environment sandbox --backup-db C:\ruta\temporal\backups\orders-sandbox-<UTC>-<UUID>.sqlite3 --manifest C:\ruta\temporal\backups\orders-sandbox-<UTC>-<UUID>.json --destination-db C:\ruta\temporal\drill\restored.sqlite3
+```
+
+Preview tiene una allowlist estricta: fuente exacta `/var/data/orders.sqlite3`, backups bajo `/var/data/backups` y restore drills bajo `/tmp/carlos-acevedo-restore-drill`. Las rutas se canonicalizan, se rechazan traversal, symlinks y alias/hardlinks de la DB live, y los destinos deben ser nuevos. La operación debe usar `umask 077`, directorios `0700` y artefactos `0600`:
+
+```bash
+umask 077
+python -m backend.sqlite_backup create --environment preview --source-db /var/data/orders.sqlite3 --destination-directory /var/data/backups
+python -m backend.sqlite_backup verify --environment preview --backup-db /var/data/backups/orders-preview-<UTC>-<UUID>.sqlite3 --manifest /var/data/backups/orders-preview-<UTC>-<UUID>.json
+python -m backend.sqlite_backup restore-drill --environment preview --backup-db /var/data/backups/orders-preview-<UTC>-<UUID>.sqlite3 --manifest /var/data/backups/orders-preview-<UTC>-<UUID>.json --destination-db /tmp/carlos-acevedo-restore-drill/<RUN_ID>/restored.sqlite3
+```
+
+Nunca copies `orders.sqlite3` directamente ni manipules `orders.sqlite3-wal` o `orders.sqlite3-shm`: el snapshot seguro depende de la API de SQLite. El restore drill nunca sustituye la DB live ni debe usarse como `ORDER_DB_PATH` del servicio. Selecciona siempre el par por nombre y UUID explícitos; no uses globs ni un alias `latest`.
+
+Un backup en el mismo persistent disk solo sirve como staging o recuperación rápida y no protege ante pérdida total del disco. Antes de Live será obligatoria al menos una copia externa privada, cifrada y verificada. El backup contiene datos reales y PII: no debe publicarse, subirse a chats ni inspeccionarse para mostrar filas o briefs.
 
 El endpoint `POST /api/paypal/orders/resolve`, con body JSON `{"token":"<paypal_order_id>"}`, permite correlacionar un PayPal Order ID con el `local_order_id` local sin volver a poner el token en un query string. Este endpoint solo realiza lookup en SQLite y no modifica estados ni consulta PayPal. **El token recibido del navegador NO es autoridad**: se valida sintácticamente, debe existir como `paypal_order_id` persistido en SQLite, y solo sirve para correlación. La página de retorno conserva el token únicamente en memoria, elimina de inmediato `token` y `PayerID` de la URL mediante `history.replaceState`, y aplica `Referrer-Policy: no-referrer`. La verificación definitiva de pago ocurre durante Capture.
 
